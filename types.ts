@@ -1,4 +1,3 @@
-
 export enum CertificateStatus {
   VALID = 'Valid',
   EXPIRING_SOON = 'Expiring Soon',
@@ -18,13 +17,71 @@ export interface Certificate {
   status: CertificateStatus; 
   pem?: string; // For download simulation
   folderId?: string | null; // New: ID of the folder this certificate belongs to
+  uploadedBy?: string; // User who uploaded the certificate
+  uploadedAt?: string; // ISO Date string
+  isTemp?: boolean; // Indicates if certificate is in temp folder
 }
 
 export interface Folder {
   id: string;
   name: string;
+  description?: string;
+  type: 'system' | 'custom';
+  permissions: string[];
   createdAt: string; // ISO Date string
-  // parentId?: string | null; // For future nesting, not used in V1
+  createdBy?: string; // User who created the folder
+  accessControl?: {
+    roles: string[];
+    users: string[];
+  };
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  active: boolean;
+  createdAt: string; // ISO Date string
+}
+
+export interface RBACConfig {
+  enabled: boolean;
+  roles: Role[];
+  users: User[];
+}
+
+export interface TempFolderConfig {
+  enabled: boolean;
+  path: string;
+  maxSize: string;
+  cleanupInterval: number; // milliseconds
+  retentionDays: number;
+}
+
+export interface SystemMetadata {
+  tempFolder: TempFolderConfig;
+  folders: {
+    defaultFolder: string;
+    systemFolders: Folder[];
+  };
+  rbac: RBACConfig;
+  customFolders: Folder[];
+}
+
+export interface MetadataConfig {
+  name: string;
+  description: string;
+  requestFramePermissions: string[];
+  prompt: string;
+  system: SystemMetadata;
 }
 
 export interface NotificationMessage {
@@ -43,4 +100,11 @@ export interface NotificationSettings {
   recipientEmail: string;
   thresholds: number[]; // e.g., [5, 10, 30]
   notificationsEnabled: boolean;
+}
+
+export interface AuthContext {
+  currentUser: User | null;
+  userRole: Role | null;
+  hasPermission: (permission: string) => boolean;
+  hasFolderAccess: (folderId: string, permission: string) => boolean;
 }

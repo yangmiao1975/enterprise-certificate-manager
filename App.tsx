@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import CertificateTable from './components/CertificateTable';
@@ -8,10 +7,10 @@ import Modal from './components/Modal';
 import UploadCertificateForm from './components/UploadCertificateForm';
 import ViewCertificateDataModal from './components/ViewCertificateDataModal';
 import NotificationSettingsModal from './components/NotificationSettingsModal';
-import FolderPanel from './components/FolderPanel'; // New Import
-import CreateEditFolderModal from './components/modals/CreateEditFolderModal'; // New Import
-import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal'; // New Import
-import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal'; // New Import
+import FolderPanel from './components/FolderPanel';
+import CreateEditFolderModal from './components/modals/CreateEditFolderModal';
+import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal';
+import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal';
 
 import { Certificate, NotificationMessage, CertificateStatus, NotificationSettings, Folder } from './types';
 import { 
@@ -26,8 +25,9 @@ import {
   assignCertificateToFolder as apiAssignCertificateToFolder
 } from './services/certificateService';
 import { loadNotificationSettings, saveNotificationSettings } from './services/notificationSettingsService';
+import { initializeAuth, getCurrentUser } from './services/authService';
+import { loadMetadata, getDefaultFolder } from './services/metadataService';
 import { ICONS, DEFAULT_NOTIFICATION_SETTINGS, ALL_CERTIFICATES_FOLDER_ID } from './constants';
-
 
 const App: React.FC = () => {
   const [allCertificates, setAllCertificates] = useState<Certificate[]>([]);
@@ -64,6 +64,9 @@ const App: React.FC = () => {
   const [isConfirmDeleteFolderModalOpen, setIsConfirmDeleteFolderModalOpen] = useState<boolean>(false);
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
 
+  // System initialization state
+  const [isSystemInitialized, setIsSystemInitialized] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const addNotification = useCallback((message: string, type: NotificationMessage['type']) => {
     const newNotification: NotificationMessage = {
@@ -134,7 +137,34 @@ Enterprise Certificate Manager (Simulated Email System)`;
     }
   }, [sendSimulatedEmail]);
 
+  // Initialize system metadata and authentication
+  useEffect(() => {
+    const initializeSystem = async () => {
+      try {
+        // Load metadata first
+        await loadMetadata();
+        
+        // Initialize authentication
+        await initializeAuth();
+        
+        // Set current user
+        const user = getCurrentUser();
+        setCurrentUser(user);
+        
+        setIsSystemInitialized(true);
+        addNotification('System initialized successfully with RBAC and metadata', 'success');
+      } catch (error) {
+        console.error('Failed to initialize system:', error);
+        addNotification('Failed to initialize system metadata', 'error');
+      }
+    };
+
+    initializeSystem();
+  }, [addNotification]);
+
   const fetchAllData = useCallback(async (currentSettings: NotificationSettings) => {
+    if (!isSystemInitialized) return;
+
     setIsLoadingCerts(true);
     setIsLoadingFolders(true);
     setErrorCerts(null);
@@ -143,18 +173,20 @@ Enterprise Certificate Manager (Simulated Email System)`;
       setAllCertificates(certsData);
       setFolders(foldersData);
       checkAndSendExpiryNotifications(certsData, currentSettings);
-    } catch (err) {
-      const errorMsg = 'Failed to load initial data.';
-      setErrorCerts(errorMsg); // Use a general error state if preferred
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to load initial data.';
+      setErrorCerts(errorMsg);
       addNotification(errorMsg, 'error');
       console.error(err);
     } finally {
       setIsLoadingCerts(false);
       setIsLoadingFolders(false);
     }
-  }, [addNotification, checkAndSendExpiryNotifications]);
+  }, [addNotification, checkAndSendExpiryNotifications, isSystemInitialized]);
 
   useEffect(() => {
+    if (!isSystemInitialized) return;
+
     const settings = loadNotificationSettings();
     setNotificationSettings(settings);
     const storedNotified = localStorage.getItem('notifiedForExpiry');
@@ -163,7 +195,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
       catch(e) { console.error("Error parsing stored notifiedForExpiry", e); setNotifiedForExpiry({});}
     }
     fetchAllData(settings);
-  }, [fetchAllData]);
+  }, [fetchAllData, isSystemInitialized]);
 
   // Filter certificates based on selectedFolderId
   useEffect(() => {
@@ -174,6 +206,16 @@ Enterprise Certificate Manager (Simulated Email System)`;
     }
   }, [allCertificates, selectedFolderId]);
 
+  const handleUserChange = useCallback(() => {
+    const user = getCurrentUser();
+    setCurrentUser(user);
+    
+    // Refresh data when user changes
+    if (isSystemInitialized) {
+      const settings = loadNotificationSettings();
+      fetchAllData(settings);
+    }
+  }, [fetchAllData, isSystemInitialized]);
 
   const handleRenewCertificate = async (id: string) => {
     setRenewingCertId(id);
@@ -377,6 +419,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
       <Header 
         onUploadClick={() => setIsUploadModalOpen(true)} 
         onSettingsClick={() => setIsNotificationSettingsModalOpen(true)} 
+        onUserChange={handleUserChange}
       />
       <NotificationArea notifications={notifications} onDismissNotification={dismissNotification} />
       

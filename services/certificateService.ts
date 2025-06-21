@@ -1,7 +1,22 @@
-
 import { Certificate, CertificateStatus, Folder } from '../types';
 import { EXPIRY_SOON_DAYS } from '../constants';
 import { analyzeCertificateWithGemini, GeminiCertificateAnalysis } from './geminiService';
+import { 
+  getAllFolders, 
+  getTempFolderId, 
+  isTempFolder,
+  getAccessibleFolders,
+  getSystemFolders,
+  getCustomFolders
+} from './metadataService';
+import { 
+  getCurrentUser, 
+  canUploadToFolder, 
+  canDeleteCertificate, 
+  canRenewCertificate,
+  canManageFolders,
+  canDeleteFolders
+} from './authService';
 
 const today = new Date();
 const addDays = (date: Date, days: number): Date => {
@@ -34,7 +49,10 @@ let mockCertificates: Certificate[] = [
     serialNumber: '0A:1B:2C:3D:4E:5F',
     pem: `-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIUeN... (mock data for prod.example.com)\n-----END CERTIFICATE-----`,
     status: CertificateStatus.VALID,
-    folderId: null,
+    folderId: 'prod-servers',
+    uploadedBy: 'admin-user',
+    uploadedAt: addDays(today, -80).toISOString(),
+    isTemp: false,
   },
   {
     id: '2',
@@ -47,7 +65,10 @@ let mockCertificates: Certificate[] = [
     serialNumber: '1F:2E:3D:4C:5B:6A',
     pem: `-----BEGIN CERTIFICATE-----\nMIIDdDCCAlmgAwIBAgIUxM... (mock data for staging.example.com)\n-----END CERTIFICATE-----`,
     status: CertificateStatus.VALID,
-    folderId: null,
+    folderId: 'internal-tools',
+    uploadedBy: 'manager-user',
+    uploadedAt: addDays(today, -150).toISOString(),
+    isTemp: false,
   },
   {
     id: '3',
@@ -61,6 +82,9 @@ let mockCertificates: Certificate[] = [
     pem: `-----BEGIN CERTIFICATE-----\nMIIDfTCCAlygAwIBAgIUbB... (mock data for dev.example.com)\n-----END CERTIFICATE-----`,
     status: CertificateStatus.VALID,
     folderId: null,
+    uploadedBy: 'viewer-user',
+    uploadedAt: addDays(today, -400).toISOString(),
+    isTemp: false,
   },
 ];
 
@@ -68,21 +92,78 @@ mockCertificates.forEach(cert => {
   cert.status = getStatus(cert.validTo);
 });
 
-let mockFolders: Folder[] = [
-    { id: 'folder-1', name: 'Production Servers', createdAt: new Date().toISOString() },
-    { id: 'folder-2', name: 'Internal Tools', createdAt: addDays(new Date(), -5).toISOString() },
-];
-// Assign some initial certs to folders for demo
-if (mockCertificates.length > 0) mockCertificates[0].folderId = 'folder-1';
-if (mockCertificates.length > 1) mockCertificates[1].folderId = 'folder-1';
-
-
 export const getCertificates = async (): Promise<Certificate[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  return mockCertificates.map(cert => ({ ...cert, status: getStatus(cert.validTo) }));
+  const currentUser = getCurrentUser();
+  
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  // Get accessible folders for the current user
+  const accessibleFolders = getAccessibleFolders(currentUser);
+  const accessibleFolderIds = accessibleFolders.map(f => f.id);
+
+  // Filter certificates based on user's folder access
+  const accessibleCertificates = mockCertificates.filter(cert => {
+    // If certificate has no folder, check if user has access to "all-certificates"
+    if (!cert.folderId) {
+      return accessibleFolderIds.includes('all-certificates');
+    }
+    return accessibleFolderIds.includes(cert.folderId);
+  });
+
+  return accessibleCertificates.map(cert => ({ ...cert, status: getStatus(cert.validTo) }));
+};
+
+export const getCertificatesByFolder = async (folderId: string): Promise<Certificate[]> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  // Check if user has access to this folder
+  const accessibleFolders = getAccessibleFolders(currentUser);
+  const hasAccess = accessibleFolders.some(f => f.id === folderId);
+  
+  if (!hasAccess) {
+    throw new Error('Access denied to this folder');
+  }
+
+  const certificates = await getCertificates();
+  
+  if (folderId === 'all-certificates') {
+    return certificates;
+  }
+  
+  return certificates.filter(cert => cert.folderId === folderId);
+};
+
+export const getTempCertificates = async (): Promise<Certificate[]> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  // Check if user has access to temp folder
+  if (!canUploadToFolder(getTempFolderId())) {
+    throw new Error('Access denied to temp folder');
+  }
+
+  const tempCertificates = mockCertificates.filter(cert => cert.isTemp === true);
+  return tempCertificates.map(cert => ({ ...cert, status: getStatus(cert.validTo) }));
 };
 
 export const renewCertificate = async (id: string): Promise<Certificate | null> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canRenewCertificate()) {
+    throw new Error('Permission denied: Cannot renew certificates');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 1000));
   const certIndex = mockCertificates.findIndex(c => c.id === id);
   if (certIndex > -1) {
@@ -114,6 +195,19 @@ export const addCertificate = async (
   fileName?: string,
   folderId?: string | null
 ): Promise<Certificate> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  // If no folder specified, default to temp folder
+  const targetFolderId = folderId || getTempFolderId();
+  
+  // Check if user can upload to the target folder
+  if (!canUploadToFolder(targetFolderId)) {
+    throw new Error('Permission denied: Cannot upload to this folder');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 300)); 
 
   let fileAsArrayBuffer: ArrayBuffer;
@@ -186,7 +280,10 @@ export const addCertificate = async (
       serialNumber,
       status: getStatus(parsedValidTo.toISOString()),
       pem: pemRepresentation,
-      folderId: folderId || null,
+      folderId: targetFolderId,
+      uploadedBy: currentUser.id,
+      uploadedAt: new Date().toISOString(),
+      isTemp: isTempFolder(targetFolderId),
     };
 
     mockCertificates.push(newCertificate);
@@ -224,6 +321,15 @@ export const addCertificate = async (
 };
 
 export const deleteCertificate = async (id: string): Promise<boolean> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canDeleteCertificate()) {
+    throw new Error('Permission denied: Cannot delete certificates');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 500));
   const initialLength = mockCertificates.length;
   mockCertificates = mockCertificates.filter(cert => cert.id !== id);
@@ -236,46 +342,122 @@ export const downloadCertificatePem = async (id: string): Promise<string | null>
   return cert?.pem || null;
 };
 
-// Folder Management
+// Folder Management - Updated to use metadata system
 export const getFolders = async (): Promise<Folder[]> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 200));
-  return [...mockFolders].sort((a,b) => a.name.localeCompare(b.name));
+  
+  // Get accessible folders for the current user
+  const accessibleFolders = getAccessibleFolders(currentUser);
+  return accessibleFolders.sort((a, b) => a.name.localeCompare(b.name));
 };
 
 export const createFolder = async (name: string): Promise<Folder> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canManageFolders()) {
+    throw new Error('Permission denied: Cannot create folders');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 300));
-  if (mockFolders.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+  
+  const allFolders = getAllFolders();
+  if (allFolders.some(f => f.name.toLowerCase() === name.toLowerCase())) {
     throw new Error(`Folder with name "${name}" already exists.`);
   }
+
   const newFolder: Folder = {
-    id: `folder-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+    id: `folder-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     name: name.trim(),
+    description: `Custom folder created by ${currentUser.username}`,
+    type: 'custom',
+    permissions: ['read', 'write'],
     createdAt: new Date().toISOString(),
+    createdBy: currentUser.id,
+    accessControl: {
+      roles: [currentUser.role],
+      users: [currentUser.id]
+    }
   };
-  mockFolders.push(newFolder);
+
+  // In a real implementation, this would be saved to the metadata system
+  // For now, we'll just return the folder
   return newFolder;
 };
 
 export const updateFolder = async (id: string, newName: string): Promise<Folder | null> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canManageFolders()) {
+    throw new Error('Permission denied: Cannot update folders');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 300));
+  
+  const allFolders = getAllFolders();
   const trimmedNewName = newName.trim();
-  if (mockFolders.some(f => f.id !== id && f.name.toLowerCase() === trimmedNewName.toLowerCase())) {
+  
+  if (allFolders.some(f => f.id !== id && f.name.toLowerCase() === trimmedNewName.toLowerCase())) {
     throw new Error(`Another folder with name "${trimmedNewName}" already exists.`);
   }
-  const folderIndex = mockFolders.findIndex(f => f.id === id);
-  if (folderIndex > -1) {
-    mockFolders[folderIndex].name = trimmedNewName;
-    return mockFolders[folderIndex];
+  
+  const folder = allFolders.find(f => f.id === id);
+  if (folder) {
+    // Check if user has access to this folder
+    if (!canManageFolders()) {
+      throw new Error('Permission denied: Cannot update this folder');
+    }
+    
+    // In a real implementation, this would update the metadata
+    return {
+      ...folder,
+      name: trimmedNewName
+    };
   }
   return null;
 };
 
 export const deleteFolder = async (id: string): Promise<boolean> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canDeleteFolders()) {
+    throw new Error('Permission denied: Cannot delete folders');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 500));
-  const initialLength = mockFolders.length;
-  mockFolders = mockFolders.filter(f => f.id !== id);
   
-  // Unassign certificates from the deleted folder
+  const allFolders = getAllFolders();
+  const folder = allFolders.find(f => f.id === id);
+  
+  if (!folder) {
+    return false;
+  }
+
+  // Check if it's a system folder
+  if (folder.type === 'system') {
+    throw new Error('Cannot delete system folders');
+  }
+
+  // Check if user has access to this folder
+  if (!canDeleteFolders()) {
+    throw new Error('Permission denied: Cannot delete this folder');
+  }
+
+  // In a real implementation, this would remove from metadata
+  // For now, just unassign certificates from the deleted folder
   mockCertificates = mockCertificates.map(cert => {
     if (cert.folderId === id) {
       return { ...cert, folderId: null };
@@ -283,14 +465,30 @@ export const deleteFolder = async (id: string): Promise<boolean> => {
     return cert;
   });
   
-  return mockFolders.length < initialLength;
+  return true;
 };
 
 export const assignCertificateToFolder = async (certificateId: string, folderId: string | null): Promise<Certificate | null> => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!canManageFolders()) {
+    throw new Error('Permission denied: Cannot assign certificates to folders');
+  }
+
   await new Promise(resolve => setTimeout(resolve, 300));
+  
   const certIndex = mockCertificates.findIndex(c => c.id === certificateId);
   if (certIndex > -1) {
+    // Check if user has access to the target folder
+    if (folderId && !canUploadToFolder(folderId)) {
+      throw new Error('Permission denied: Cannot assign to this folder');
+    }
+    
     mockCertificates[certIndex].folderId = folderId;
+    mockCertificates[certIndex].isTemp = folderId ? isTempFolder(folderId) : false;
     return mockCertificates[certIndex];
   }
   return null;
