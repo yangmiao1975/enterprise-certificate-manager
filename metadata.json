@@ -1,0 +1,6 @@
+{
+  "name": "Enterprise Certificate Manager",
+  "description": "A Venafi-like application to manage enterprise certificates, offering renewal, download, and upload functionalities, enhanced with AI-powered insights and simulated notifications.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
