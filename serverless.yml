@@ -1,0 +1,211 @@
+service: enterprise-certificate-manager
+
+frameworkVersion: '3'
+
+# AWS Lambda Configuration
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    NODE_ENV: production
+    GCP_PROJECT_ID: ${env:GCP_PROJECT_ID}
+    GCP_LOCATION: ${env:GCP_LOCATION}
+    JWT_SECRET: ${env:JWT_SECRET}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:*:*:*"
+
+# AWS Lambda Functions
+functions:
+  api:
+    handler: backend/src/handler.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+    environment:
+      DATABASE_URL: ${env:DATABASE_URL}
+    timeout: 30
+    memorySize: 512
+
+  frontend:
+    handler: frontend/src/handler.handler
+    events:
+      - http:
+          path: /
+          method: GET
+      - http:
+          path: /{proxy+}
+          method: GET
+    environment:
+      API_URL: ${self:service}-${sls:stage}-api
+    timeout: 10
+    memorySize: 256
+
+# GCP Cloud Run Configuration
+custom:
+  gcp:
+    projectId: ${env:GCP_PROJECT_ID}
+    region: ${env:GCP_LOCATION}
+    serviceAccount: certificate-manager@${env:GCP_PROJECT_ID}.iam.gserviceaccount.com
+
+# Cloud Run services
+resources:
+  Resources:
+    # Cloud Run service for backend API
+    BackendService:
+      Type: AWS::CloudFormation::CustomResource
+      Properties:
+        ServiceToken: !GetAtt CloudRunHandler.Arn
+        ProjectId: ${self:custom.gcp.projectId}
+        Region: ${self:custom.gcp.region}
+        ServiceName: certificate-manager-api
+        Image: gcr.io/${self:custom.gcp.projectId}/certificate-manager-backend:latest
+        Port: 8080
+        Memory: 512Mi
+        CPU: 1
+        MaxInstances: 10
+        Environment:
+          NODE_ENV: production
+          GCP_PROJECT_ID: ${env:GCP_PROJECT_ID}
+          GCP_LOCATION: ${env:GCP_LOCATION}
+          JWT_SECRET: ${env:JWT_SECRET}
+          DATABASE_URL: ${env:DATABASE_URL}
+
+    # Cloud Run service for frontend
+    FrontendService:
+      Type: AWS::CloudFormation::CustomResource
+      Properties:
+        ServiceToken: !GetAtt CloudRunHandler.Arn
+        ProjectId: ${self:custom.gcp.projectId}
+        Region: ${self:custom.gcp.region}
+        ServiceName: certificate-manager-frontend
+        Image: gcr.io/${self:custom.gcp.projectId}/certificate-manager-frontend:latest
+        Port: 80
+        Memory: 256Mi
+        CPU: 0.5
+        MaxInstances: 5
+        Environment:
+          VITE_API_URL: https://certificate-manager-api-${sls:stage}.run.app
+
+# Lambda function to handle Cloud Run operations
+    CloudRunHandler:
+      Type: AWS::Lambda::Function
+      Properties:
+        Handler: index.handler
+        Runtime: nodejs18.x
+        Code:
+          ZipFile: |
+            const { CloudRun } = require('@google-cloud/run');
+            const cloudRun = new CloudRun();
+            
+            exports.handler = async (event) => {
+              const { ProjectId, Region, ServiceName, Image, Port, Memory, CPU, MaxInstances, Environment } = event.ResourceProperties;
+              
+              try {
+                const service = await cloudRun.getService({
+                  name: `projects/${ProjectId}/locations/${Region}/services/${ServiceName}`
+                });
+                
+                return {
+                  PhysicalResourceId: service.metadata.name,
+                  Data: {
+                    ServiceUrl: service.status.url
+                  }
+                };
+              } catch (error) {
+                // Create service if it doesn't exist
+                const service = await cloudRun.createService({
+                  parent: `projects/${ProjectId}/locations/${Region}`,
+                  serviceId: ServiceName,
+                  service: {
+                    metadata: {
+                      name: ServiceName,
+                      annotations: {
+                        'run.googleapis.com/client-name': 'cloud-console'
+                      }
+                    },
+                    spec: {
+                      template: {
+                        metadata: {
+                          annotations: {
+                            'autoscaling.knative.dev/maxScale': MaxInstances.toString()
+                          }
+                        },
+                        spec: {
+                          containers: [{
+                            image: Image,
+                            ports: [{ containerPort: Port }],
+                            resources: {
+                              limits: {
+                                memory: Memory,
+                                cpu: CPU
+                              }
+                            },
+                            env: Object.entries(Environment).map(([key, value]) => ({
+                              name: key,
+                              value: value
+                            }))
+                          }]
+                        }
+                      }
+                    }
+                  }
+                });
+                
+                return {
+                  PhysicalResourceId: service.metadata.name,
+                  Data: {
+                    ServiceUrl: service.status.url
+                  }
+                };
+              }
+            };
+        Role: !GetAtt CloudRunExecutionRole.Arn
+
+    # IAM role for Cloud Run operations
+    CloudRunExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+          - PolicyName: CloudRunAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - run:services.get
+                    - run:services.create
+                    - run:services.update
+                    - run:services.delete
+                  Resource: '*'
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+  - serverless-gcp-cloud-run
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    lambdaPort: 3002
+  gcp:
+    projectId: ${env:GCP_PROJECT_ID}
+    region: ${env:GCP_LOCATION} 

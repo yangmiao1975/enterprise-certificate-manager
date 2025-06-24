@@ -1,0 +1,42 @@
+{
+  "name": "certificate-manager-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Enterprise Certificate Manager",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:docker": "vite build --mode docker",
+    "build:serverless": "vite build --mode serverless",
+    "build:vm": "vite build --mode vm",
+    "serve": "serve -s dist -l 3000"
+  },
+  "dependencies": {
+    "@google/genai": "^1.5.1",
+    "@types/axios": "^0.9.36",
+    "asn1js": "^3.0.6",
+    "axios": "^1.10.0",
+    "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
+    "pkijs": "^3.2.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.48.2",
+    "react-hot-toast": "^2.4.1",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.32",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@vitejs/plugin-react": "^4.1.1",
+    "serve": "^14.2.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
