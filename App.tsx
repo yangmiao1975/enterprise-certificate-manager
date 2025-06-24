@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import CertificateTable from './components/CertificateTable';
