@@ -414,7 +414,30 @@ Enterprise Certificate Manager (Simulated Email System)`;
         setIsFolderActionLoading(false);
     }
   };
-  
+
+  // Helper to check if a folder is a descendant of another
+  function isDescendant(folders: Folder[], folderId: string, possibleAncestorId: string): boolean {
+    let current: Folder | undefined = folders.find(f => f.id === folderId);
+    while (current && current.parentId) {
+      if (current.parentId === possibleAncestorId) return true;
+      const next: Folder | undefined = folders.find(f => f.id === current.parentId);
+      if (!next) break;
+      current = next;
+    }
+    return false;
+  }
+
+  const handleMoveFolder = (folderId: string, newParentId: string | null) => {
+    // Prevent moving a folder into itself or its descendants
+    if (folderId === newParentId) return;
+    if (newParentId && isDescendant(folders, newParentId, folderId)) return;
+    setFolders(prevFolders =>
+      prevFolders.map(folder =>
+        folder.id === folderId ? { ...folder, parentId: newParentId } : folder
+      )
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-50">
       <Header 
@@ -435,6 +458,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
               onEditFolder={handleEditFolder}
               onDeleteFolder={handleRequestDeleteFolder}
               isLoading={isLoadingFolders}
+              onMoveFolder={handleMoveFolder}
             />
           </div>
           <div className="md:w-3/4 lg:w-4/5 flex-grow min-w-0"> {/* min-w-0 for flex child to allow shrinking */}

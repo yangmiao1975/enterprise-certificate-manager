@@ -1,0 +1,216 @@
+{
+  "name": "Enterprise Certificate Manager",
+  "description": "A Venafi-like application to manage enterprise certificates",
+  "requestFramePermissions": [],
+  "prompt": "",
+  "system": {
+    "tempFolder": {
+      "enabled": true,
+      "path": "./temp_certs",
+      "maxSize": "100MB",
+      "cleanupInterval": 3600000,
+      "retentionDays": 7
+    },
+    "folders": {
+      "defaultFolder": "all-certificates",
+      "systemFolders": [
+        {
+          "id": "all-certificates",
+          "name": "All Certificates",
+          "description": "System folder containing all certificates",
+          "type": "system",
+          "permissions": ["read"],
+          "createdAt": "2024-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "rbac": {
+      "enabled": true,
+      "roles": [
+        {
+          "id": "admin",
+          "name": "Administrator",
+          "description": "Full system access",
+          "permissions": [
+            "certificates:read",
+            "certificates:write",
+            "certificates:delete",
+            "certificates:renew",
+            "folders:read",
+            "folders:write",
+            "folders:delete",
+            "system:settings",
+            "notifications:manage"
+          ]
+        },
+        {
+          "id": "manager",
+          "name": "Certificate Manager",
+          "description": "Can manage certificates and folders",
+          "permissions": [
+            "certificates:read",
+            "certificates:write",
+            "certificates:renew",
+            "folders:read",
+            "folders:write",
+            "notifications:view"
+          ]
+        },
+        {
+          "id": "viewer",
+          "name": "Certificate Viewer",
+          "description": "Read-only access to certificates",
+          "permissions": [
+            "certificates:read",
+            "folders:read"
+          ]
+        }
+      ],
+      "users": [
+        {
+          "id": "admin-user",
+          "username": "admin",
+          "email": "admin@example.com",
+          "role": "admin",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "manager-user",
+          "username": "manager",
+          "email": "manager@example.com",
+          "role": "manager",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "viewer-user",
+          "username": "viewer",
+          "email": "viewer@example.com",
+          "role": "viewer",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "customFolders": [
+      {
+        "id": "integration-team",
+        "name": "Integration Team",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "all-certificates",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "erp",
+        "name": "ERP",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "all-certificates",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "hcm",
+        "name": "HCM",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "all-certificates",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "integration-team-nonprod",
+        "name": "NON-PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "integration-team",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "integration-team-prod",
+        "name": "PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "integration-team",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "erp-nonprod",
+        "name": "NON-PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "erp",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "erp-prod",
+        "name": "PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "erp",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "hcm-nonprod",
+        "name": "NON-PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "hcm",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      },
+      {
+        "id": "hcm-prod",
+        "name": "PROD",
+        "type": "custom",
+        "permissions": ["read", "write"],
+        "createdBy": "admin-user",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "parentId": "hcm",
+        "accessControl": {
+          "roles": ["admin", "manager"],
+          "users": ["admin-user", "manager-user"]
+        }
+      }
+    ]
+  }
+} 

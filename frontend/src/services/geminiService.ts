@@ -1,8 +1,8 @@
-
 import { GoogleGenAI, GenerateContentResponse, Content } from "@google/genai";
 import { AIChatMessage, Certificate } from '../types'; // Added Certificate import
 
-const API_KEY = process.env.API_KEY;
+// Use Vite's import.meta.env for frontend environment variables
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 if (!API_KEY) {
   console.warn("API_KEY for Gemini is not set. AI features will be disabled or use mock data.");
@@ -39,7 +39,7 @@ export const getCertificateManagementInsights = async (): Promise<string> => {
       Present each practice as a short paragraph starting with a bolded title (e.g., "**Practice Title:** Message.").
       Ensure the output is plain text suitable for direct display in a web UI.`,
     });
-    return response.text;
+    return response.text ?? "";
   } catch (error) {
     console.error("Error fetching insights from Gemini API:", error);
     return "Failed to load AI-powered insights. Please check your API key and network connection. Using fallback advice:\n\n" + MOCK_INSIGHTS;
@@ -93,7 +93,7 @@ If asked for information that requires external lookup beyond general knowledge 
             // History is managed by the chat object, no need to pass it here again
         });
 
-        return response.text;
+        return response.text ?? "";
 
     } catch (error) {
         console.error("Error getting chat response from Gemini API:", error);
@@ -176,7 +176,7 @@ ${base64CertificateData}
       }
     });
     
-    let jsonStr = response.text.trim();
+    let jsonStr = (response.text ?? "").trim();
     const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
     const match = jsonStr.match(fenceRegex);
     if (match && match[2]) {

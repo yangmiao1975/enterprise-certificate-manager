@@ -34,6 +34,7 @@ export interface Folder {
     roles: string[];
     users: string[];
   };
+  parentId?: string | null;
 }
 
 export interface Role {
