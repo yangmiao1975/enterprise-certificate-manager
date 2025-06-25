@@ -9,19 +9,21 @@ import { validateCertificateUpload } from '../middleware/validation.js';
 const router = express.Router();
 
 // Configure multer for file uploads
+const allowedExtensions = [
+  '.pem', '.crt', '.cer', '.key', '.ca-bundle',
+  '.der', '.pfx', '.p12', '.p7b', '.p7c', '.csr'
+];
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 // 10MB default
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/x-pem-file' || 
-        file.originalname.endsWith('.pem') ||
-        file.originalname.endsWith('.crt') ||
-        file.originalname.endsWith('.cer')) {
+    const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+    if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PEM certificate files are allowed'), false);
+      cb(new Error('Only certificate files (.pem, .crt, .cer, .key, .ca-bundle, .der, .pfx, .p12, .p7b, .p7c, .csr) are allowed'), false);
     }
   }
 });
@@ -59,7 +61,13 @@ router.get('/', async (req, res, next) => {
 
     query += ' ORDER BY c.uploaded_at DESC';
 
-    const certificates = await db.all(query, params);
+    const certificates = await new Promise((resolve, reject) => {
+      db.all(query, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows);
+      });
+    });
+    console.log('certificates:', certificates);
     res.json(certificates);
   } catch (error) {
     next(error);
@@ -102,9 +110,10 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
       return res.status(400).json({ error: 'Certificate file is required' });
     }
 
-    // Parse certificate
+    // Parse certificate (pass buffer and originalname)
+    const certificateData = await parseCertificate(file.buffer, file.originalname);
+    console.log('Parsed certificate data:', certificateData);
     const pemContent = file.buffer.toString('utf8');
-    const certificateData = await parseCertificate(pemContent);
 
     // Create certificate in GCP
     const gcpResult = await gcpCertificateService.createCertificate(certificateData, pemContent);
@@ -112,38 +121,47 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
     // Save to database
     const certificateId = uuidv4();
     const now = new Date().toISOString();
-    
-    await db.run(`
-      INSERT INTO certificates (
-        id, common_name, issuer, subject, valid_from, valid_to, 
-        algorithm, serial_number, status, pem_content, folder_id, 
-        uploaded_by, uploaded_at, gcp_certificate_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      certificateId,
-      certificateData.commonName,
-      certificateData.issuer,
-      certificateData.subject,
-      certificateData.validFrom,
-      certificateData.validTo,
-      certificateData.algorithm,
-      certificateData.serialNumber,
-      certificateData.status,
-      pemContent,
-      folderId || null,
-      userId,
-      now,
-      gcpResult.gcpCertificateName
-    ]);
+    try {
+      await db.run(`
+        INSERT INTO certificates (
+          id, common_name, issuer, subject, valid_from, valid_to, 
+          algorithm, serial_number, status, pem_content, folder_id, 
+          uploaded_by, uploaded_at, gcp_certificate_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        certificateId,
+        certificateData.commonName,
+        certificateData.issuer,
+        certificateData.subject,
+        certificateData.validFrom,
+        certificateData.validTo,
+        certificateData.algorithm,
+        certificateData.serialNumber,
+        certificateData.status,
+        pemContent,
+        folderId || null,
+        userId,
+        now,
+        gcpResult.gcpCertificateName
+      ]);
+      console.log('Inserted certificate into DB:', certificateId);
+    } catch (insertError) {
+      console.error('Error inserting certificate into DB:', insertError);
+    }
 
-    const certificate = await db.get(`
-      SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
-      FROM certificates c
-      LEFT JOIN folders f ON c.folder_id = f.id
-      LEFT JOIN users u ON c.uploaded_by = u.id
-      WHERE c.id = ?
-    `, [certificateId]);
-
+    const certificate = await new Promise((resolve, reject) => {
+      db.get(`
+        SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
+        FROM certificates c
+        LEFT JOIN folders f ON c.folder_id = f.id
+        LEFT JOIN users u ON c.uploaded_by = u.id
+        WHERE c.id = ?
+      `, [certificateId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    console.log('Fetched certificate after insert:', certificate);
     res.status(201).json(certificate);
   } catch (error) {
     next(error);

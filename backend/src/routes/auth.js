@@ -12,8 +12,17 @@ router.post('/login', validateLogin, async (req, res, next) => {
     const { username, password } = req.body;
     const db = getDatabase();
 
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE username = ? AND active = 1', [username], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    console.log('username:', username);
+    console.log('password:', password);
+    console.log('password_hash:', user ? user.password_hash : 'NO USER');
+    console.log('user object:', user);
     // Find user
-    const user = await db.get('SELECT * FROM users WHERE username = ? AND active = 1', [username]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -25,8 +34,13 @@ router.post('/login', validateLogin, async (req, res, next) => {
     }
 
     // Get user role and permissions
-    const role = await db.get('SELECT * FROM roles WHERE id = ?', [user.role]);
-    const permissions = role ? JSON.parse(role.permissions) : [];
+    const role = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM roles WHERE id = ?', [user.role], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    const permissions = (role && role.permissions) ? JSON.parse(role.permissions) : [];
 
     // Generate JWT token
     const token = jwt.sign(

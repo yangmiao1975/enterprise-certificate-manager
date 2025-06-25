@@ -1,5 +1,4 @@
 import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
@@ -18,10 +17,7 @@ export async function initializeDatabase() {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  db = await open({
-    filename: dbPath,
-    driver: sqlite3.Database
-  });
+  db = new sqlite3.Database(dbPath);
 
   // Create tables
   await createTables();
@@ -155,7 +151,7 @@ async function initializeDefaultData() {
 
   // Insert default admin user (password: admin123)
   const bcrypt = await import('bcryptjs');
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const passwordHash = await bcrypt.default.hash('admin123', 10);
   
   await db.run(
     'INSERT OR IGNORE INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',

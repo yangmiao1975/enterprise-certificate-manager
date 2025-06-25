@@ -1,136 +1,65 @@
-import { Certificate } from 'pkijs';
-import { fromBER } from 'asn1js';
+import { X509Certificate } from '@peculiar/x509';
 
-export async function parseCertificate(pemContent) {
+export async function parseCertificate(fileContent, originalName = "") {
   try {
-    // Remove PEM headers and decode base64
-    const base64Data = pemContent
-      .replace(/-----BEGIN CERTIFICATE-----/, '')
-      .replace(/-----END CERTIFICATE-----/, '')
-      .replace(/\s/g, '');
-
-    const binaryData = atob(base64Data);
-    const uint8Array = new Uint8Array(binaryData.length);
-    for (let i = 0; i < binaryData.length; i++) {
-      uint8Array[i] = binaryData.charCodeAt(i);
+    let der;
+    const contentStr = fileContent.toString('utf8');
+    if (contentStr.includes('-----BEGIN CERTIFICATE-----')) {
+      // PEM: strip header/footer and decode base64
+      let pem = contentStr
+        .replace(/-----BEGIN CERTIFICATE-----/, '')
+        .replace(/-----END CERTIFICATE-----/, '')
+        .replace(/\r?\n|\r/g, '');
+      der = Buffer.from(pem, 'base64');
+    } else {
+      // DER: use buffer as-is
+      der = fileContent;
     }
 
-    // Parse ASN.1 structure
-    const asn1 = fromBER(uint8Array.buffer);
-    const certificate = new Certificate({ schema: asn1.result });
+    const cert = new X509Certificate(der);
+    // console.log('subjectAltName:', cert.subjectAltName);
+    // console.log('cert:', cert);
 
-    // Extract certificate information
-    const commonName = extractCommonName(certificate.subject);
-    const issuer = extractIssuer(certificate.issuer);
-    const subject = extractSubject(certificate.subject);
-    const validFrom = certificate.notBefore.value;
-    const validTo = certificate.notAfter.value;
-    const algorithm = certificate.signatureAlgorithm.algorithmId;
-    const serialNumber = certificate.serialNumber.valueBlock.valueHex.toString('hex').toUpperCase();
-
-    // Calculate status
-    const status = calculateStatus(validTo);
+    // Try to get CN, fallback to parsing subject, then to first DNS SAN from subjectAltName
+    let commonName = cert.subjectCommonName;
+    if (!commonName || commonName === 'Unknown') {
+      // Try to parse CN from subject string
+      const subjectMatch = cert.subject.match(/CN=([^,]+)/);
+      if (subjectMatch && subjectMatch[1]) {
+        commonName = subjectMatch[1].trim();
+      }
+    }
+    if (!commonName || commonName === 'Unknown') {
+      // Try to extract first DNS from subjectAltName string
+      if (typeof cert.subjectAltName === 'string') {
+        const dnsMatch = cert.subjectAltName.match(/DNS:([^,\s]+)/);
+        if (dnsMatch && dnsMatch[1]) {
+          commonName = dnsMatch[1].toLowerCase();
+        }
+      }
+    }
 
     return {
-      commonName,
-      issuer,
-      subject,
-      validFrom: validFrom.toISOString(),
-      validTo: validTo.toISOString(),
-      algorithm: algorithm.toString(),
-      serialNumber: formatSerialNumber(serialNumber),
-      status
+      commonName: commonName || 'Unknown',
+      issuer: cert.issuer,
+      subject: cert.subject,
+      validFrom: cert.notBefore.toISOString(),
+      validTo: cert.notAfter.toISOString(),
+      algorithm: cert.publicKey?.algorithm?.name || 'Unknown',
+      serialNumber: cert.serialNumber,
+      status: calculateStatus(cert.notAfter),
     };
   } catch (error) {
     console.error('Error parsing certificate:', error);
-    throw new Error('Invalid certificate format');
-  }
-}
-
-function extractCommonName(subject) {
-  try {
-    const commonNameAttr = subject.typesAndValues.find(attr => 
-      attr.type === '2.5.4.3' // Common Name OID
-    );
-    return commonNameAttr ? commonNameAttr.value.valueBlock.value : 'Unknown';
-  } catch (error) {
-    return 'Unknown';
-  }
-}
-
-function extractIssuer(issuer) {
-  try {
-    const parts = [];
-    issuer.typesAndValues.forEach(attr => {
-      const oid = attr.type;
-      const value = attr.value.valueBlock.value;
-      
-      switch (oid) {
-        case '2.5.4.6': // Country
-          parts.push(`C=${value}`);
-          break;
-        case '2.5.4.10': // Organization
-          parts.push(`O=${value}`);
-          break;
-        case '2.5.4.11': // Organizational Unit
-          parts.push(`OU=${value}`);
-          break;
-        case '2.5.4.3': // Common Name
-          parts.push(`CN=${value}`);
-          break;
-        case '2.5.4.7': // Locality
-          parts.push(`L=${value}`);
-          break;
-        case '2.5.4.8': // State
-          parts.push(`ST=${value}`);
-          break;
-      }
-    });
-    return parts.join(', ');
-  } catch (error) {
-    return 'Unknown Issuer';
-  }
-}
-
-function extractSubject(subject) {
-  try {
-    const parts = [];
-    subject.typesAndValues.forEach(attr => {
-      const oid = attr.type;
-      const value = attr.value.valueBlock.value;
-      
-      switch (oid) {
-        case '2.5.4.6': // Country
-          parts.push(`C=${value}`);
-          break;
-        case '2.5.4.10': // Organization
-          parts.push(`O=${value}`);
-          break;
-        case '2.5.4.11': // Organizational Unit
-          parts.push(`OU=${value}`);
-          break;
-        case '2.5.4.3': // Common Name
-          parts.push(`CN=${value}`);
-          break;
-        case '2.5.4.7': // Locality
-          parts.push(`L=${value}`);
-          break;
-        case '2.5.4.8': // State
-          parts.push(`ST=${value}`);
-          break;
-      }
-    });
-    return parts.join(', ');
-  } catch (error) {
-    return 'Unknown Subject';
+    throw new Error('Invalid or unsupported certificate format. This parser supports PEM/DER X.509 certificates with RSA, EC, Ed25519, and more.');
   }
 }
 
 function calculateStatus(validTo) {
+  if (!validTo) return 'UNKNOWN';
   const now = new Date();
   const expiryDate = new Date(validTo);
   const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-
   if (expiryDate < now) {
     return 'EXPIRED';
   } else if (daysUntilExpiry <= 30) {
@@ -138,9 +67,4 @@ function calculateStatus(validTo) {
   } else {
     return 'VALID';
   }
-}
-
-function formatSerialNumber(serialNumber) {
-  // Format as hex with colons
-  return serialNumber.match(/.{1,2}/g).join(':').toUpperCase();
 } 

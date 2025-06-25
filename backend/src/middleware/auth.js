@@ -21,7 +21,7 @@ export const authMiddleware = async (req, res, next) => {
 
     // Get user role and permissions
     const role = await db.get('SELECT * FROM roles WHERE id = ?', [user.role]);
-    const permissions = role ? JSON.parse(role.permissions) : [];
+    const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
 
     req.user = {
       ...user,

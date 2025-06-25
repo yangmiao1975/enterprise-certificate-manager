@@ -69,7 +69,7 @@ open http://localhost:3000
 #### Environment Variables for Docker
 ```bash
 # GCP Configuration
-GCP_PROJECT_ID=your-gcp-project-id
+GCP_PROJECT_ID=enterprise-certificate-mgmt
 GCP_LOCATION=us-central1
 
 # JWT Configuration

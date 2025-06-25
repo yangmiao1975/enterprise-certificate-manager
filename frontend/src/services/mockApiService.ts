@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Certificate, Folder, User, Role, CertificateStatus } from '../../../types';
+import { Certificate, Folder, User, Role, CertificateStatus } from '../types';
 
 // Mock data
 const mockCertificates: Certificate[] = [

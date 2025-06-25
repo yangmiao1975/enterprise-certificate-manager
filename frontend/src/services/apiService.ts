@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { mockApiService } from './mockApiService';
-import type { Certificate, Folder, User, Role } from '../../../types';
+// import { mockApiService } from './mockApiService';
+import type { Certificate, Folder, User, Role } from '../types';
 
 // Vite env types for import.meta.env
 /// <reference types="vite/client" />
@@ -175,8 +175,8 @@ class RealApiService implements ApiService {
   }
 }
 
-// Export the appropriate service based on environment
-export const apiService: ApiService = isPreviewMode ? mockApiService : new RealApiService();
+// Export the real API service only
+export const apiService: ApiService = new RealApiService();
 
 // Export preview mode status
 export const isPreviewModeEnabled = isPreviewMode; 
