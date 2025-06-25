@@ -12,6 +12,7 @@ import FolderPanel from './components/FolderPanel';
 import CreateEditFolderModal from './components/modals/CreateEditFolderModal';
 import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal';
 import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal';
+import Login from './components/Login';
 
 import { Certificate, NotificationMessage, CertificateStatus, NotificationSettings, Folder } from './types';
 import { 
@@ -30,33 +31,30 @@ import { initializeAuth, getCurrentUser } from './services/authService';
 import { loadMetadata, getDefaultFolder } from './services/metadataService';
 import { ICONS, DEFAULT_NOTIFICATION_SETTINGS, ALL_CERTIFICATES_FOLDER_ID } from './constants';
 
+const isAuthenticated = () => !!localStorage.getItem('authToken');
+
 const App: React.FC = () => {
+  // All hooks must be called unconditionally at the top
+  const [loggedIn, setLoggedIn] = useState(isAuthenticated());
   const [allCertificates, setAllCertificates] = useState<Certificate[]>([]);
   const [filteredCertificates, setFilteredCertificates] = useState<Certificate[]>([]);
   const [isLoadingCerts, setIsLoadingCerts] = useState<boolean>(true);
   const [errorCerts, setErrorCerts] = useState<string | null>(null);
-  
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isLoadingFolders, setIsLoadingFolders] = useState<boolean>(true);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(ALL_CERTIFICATES_FOLDER_ID);
-
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
-  
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
   const [viewModalMode, setViewModalMode] = useState<'view' | 'download'>('view');
   const [renewingCertId, setRenewingCertId] = useState<string | null>(null);
-
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState<boolean>(false);
   const [certToDelete, setCertToDelete] = useState<Certificate | null>(null);
-
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [isNotificationSettingsModalOpen, setIsNotificationSettingsModalOpen] = useState<boolean>(false);
   const [notifiedForExpiry, setNotifiedForExpiry] = useState<Record<string, boolean>>({});
   const notifiedForExpiryRef = React.useRef(notifiedForExpiry);
-
-  // Folder Modals State
   const [isCreateEditFolderModalOpen, setIsCreateEditFolderModalOpen] = useState<boolean>(false);
   const [folderToEdit, setFolderToEdit] = useState<Folder | null>(null);
   const [isFolderActionLoading, setIsFolderActionLoading] = useState<boolean>(false);
@@ -64,8 +62,6 @@ const App: React.FC = () => {
   const [certToAssignFolder, setCertToAssignFolder] = useState<Certificate | null>(null);
   const [isConfirmDeleteFolderModalOpen, setIsConfirmDeleteFolderModalOpen] = useState<boolean>(false);
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
-
-  // System initialization state
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -99,7 +95,7 @@ const App: React.FC = () => {
   const checkAndSendExpiryNotifications = useCallback((certs: Certificate[], settings: NotificationSettings) => {
     if (!settings.notificationsEnabled || !settings.recipientEmail) return;
     const now = new Date();
-    let updatedNotifiedForExpiry = { ...notifiedForExpiryRef.current };
+    let updatedNotifiedForExpiry = { ...(notifiedForExpiryRef.current ?? {}) };
     let emailSentThisCycle = false;
 
     certs.forEach(cert => {
@@ -163,6 +159,26 @@ Enterprise Certificate Manager (Simulated Email System)`;
     initializeSystem();
   }, [addNotification]);
 
+  function mapCertificateApiToFrontend(cert: any): Certificate {
+    return {
+      id: cert.id,
+      commonName: cert.common_name,
+      issuer: cert.issuer,
+      subject: cert.subject,
+      validFrom: cert.valid_from,
+      validTo: cert.valid_to,
+      algorithm: cert.algorithm,
+      serialNumber: cert.serial_number,
+      status: cert.status,
+      pem: cert.pem_content,
+      folderId: cert.folder_id,
+      uploadedBy: cert.uploaded_by,
+      uploadedAt: cert.uploaded_at,
+      isTemp: cert.is_temp,
+      // Add any other fields as needed
+    };
+  }
+
   const fetchAllData = useCallback(async (currentSettings: NotificationSettings) => {
     if (!isSystemInitialized) return;
 
@@ -170,7 +186,8 @@ Enterprise Certificate Manager (Simulated Email System)`;
     setIsLoadingFolders(true);
     setErrorCerts(null);
     try {
-      const [certsData, foldersData] = await Promise.all([getCertificates(), getFolders()]);
+      const [certsDataRaw, foldersData] = await Promise.all([getCertificates(), getFolders()]);
+      const certsData = certsDataRaw.map(mapCertificateApiToFrontend);
       setAllCertificates(certsData);
       setFolders(foldersData);
       checkAndSendExpiryNotifications(certsData, currentSettings);
@@ -221,20 +238,11 @@ Enterprise Certificate Manager (Simulated Email System)`;
   const handleRenewCertificate = async (id: string) => {
     setRenewingCertId(id);
     try {
-      const renewedCert = await apiRenewCertificate(id);
-      if (renewedCert) {
-        setAllCertificates(prevCerts => 
-          prevCerts.map(c => (c.id === id ? renewedCert : c))
-        );
-        addNotification(`Certificate ${renewedCert.commonName} renewed successfully.`, 'success');
-        // checkAndSendExpiryNotifications will be triggered by useEffect watching allCertificates if desired,
-        // or can be called explicitly here with the new list if immediate check is needed.
-        // For simplicity and to rely on the useEffect, let's assume it handles it or call it:
-        checkAndSendExpiryNotifications(allCertificates.map(c => (c.id === id ? renewedCert : c)), notificationSettings);
-
-      } else {
-        addNotification('Failed to renew certificate: not found.', 'error');
-      }
+      await apiRenewCertificate(id); // Only show notification, do not update state with response
+      addNotification(`Certificate renewal initiated.`, 'success');
+      // Optionally, refetch certificates here to update status
+      // const certsData = await getCertificates();
+      // setAllCertificates(certsData);
     } catch (err) {
       addNotification('An error occurred while renewing certificate.', 'error');
     } finally {
@@ -256,39 +264,23 @@ Enterprise Certificate Manager (Simulated Email System)`;
 
   const handleUploadCertificateFile = async (file: File, folderId: string | null): Promise<void> => {
     if (!file) {
-        addNotification('No file selected for upload.', 'error');
-        throw new Error('No file selected.');
+      addNotification('No file selected for upload.', 'error');
+      throw new Error('No file selected.');
     }
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const arrayBufferContent = e.target?.result as ArrayBuffer;
-            if (!arrayBufferContent || arrayBufferContent.byteLength === 0) {
-                addNotification('Could not read file content or file is empty.', 'error');
-                reject(new Error('Could not read file content or file is empty.'));
-                return;
-            }
-            try {
-                const newCertificate = await apiAddCertificate(arrayBufferContent, file.name, folderId);
-                setAllCertificates(prevCerts => 
-                  [newCertificate, ...prevCerts].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime())
-                );
-                addNotification(`Certificate ${newCertificate.commonName} (from ${file.name}) added successfully.`, 'success');
-                setIsUploadModalOpen(false);
-                checkAndSendExpiryNotifications([newCertificate, ...allCertificates], notificationSettings); // Pass the potential new list
-                resolve();
-            } catch (err: any) {
-                addNotification(err.message || `Failed to add certificate from ${file.name}.`, 'error');
-                reject(err);
-            }
-        };
-        reader.onerror = () => {
-            const errorMsg = `Error reading file ${file.name}.`;
-            addNotification(errorMsg, 'error');
-            reject(new Error(errorMsg));
-        };
-        reader.readAsArrayBuffer(file);
-    });
+    try {
+      console.log('file:', file, 'isFile:', file instanceof File);
+      const newCertificateApi = await apiAddCertificate(file, folderId || undefined); // Pass File directly
+      const newCertificate = mapCertificateApiToFrontend(newCertificateApi);
+      setAllCertificates(prevCerts => 
+        [newCertificate, ...prevCerts].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime())
+      );
+      addNotification(`Certificate ${newCertificate.commonName} (from ${file.name}) added successfully.`, 'success');
+      setIsUploadModalOpen(false);
+      checkAndSendExpiryNotifications([newCertificate, ...allCertificates], notificationSettings);
+    } catch (err: any) {
+      addNotification(err.message || `Failed to add certificate from ${file.name}.`, 'error');
+      throw err;
+    }
   };
 
   const handleRequestDeleteCertificate = (certificate: Certificate) => {
@@ -299,15 +291,11 @@ Enterprise Certificate Manager (Simulated Email System)`;
   const handleConfirmDeleteCertificate = async () => {
     if (!certToDelete) return;
     try {
-      const success = await apiDeleteCertificate(certToDelete.id);
-      if (success) {
-        const certIdToDelete = certToDelete.id;
-        setAllCertificates(prevCerts => prevCerts.filter(c => c.id !== certIdToDelete));
-        addNotification(`Certificate ${certToDelete.commonName} deleted.`, 'success');
-        checkAndSendExpiryNotifications(allCertificates.filter(c => c.id !== certIdToDelete), notificationSettings);
-      } else {
-        addNotification(`Failed to delete cert ${certToDelete.commonName}: not found.`, 'error');
-      }
+      await apiDeleteCertificate(certToDelete.id);
+      const certIdToDelete = certToDelete.id;
+      setAllCertificates(prevCerts => prevCerts.filter(c => c.id !== certIdToDelete));
+      addNotification(`Certificate ${certToDelete.commonName} deleted.`, 'success');
+      checkAndSendExpiryNotifications(allCertificates.filter(c => c.id !== certIdToDelete), notificationSettings);
     } catch (err) {
       addNotification(`Error deleting cert ${certToDelete.commonName}.`, 'error');
     } finally {
@@ -437,6 +425,11 @@ Enterprise Certificate Manager (Simulated Email System)`;
       )
     );
   };
+
+  // Only after all hooks, do conditional rendering
+  if (!loggedIn) {
+    return <Login onLogin={() => setLoggedIn(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-50">

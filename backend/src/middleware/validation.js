@@ -16,7 +16,8 @@ const registerSchema = Joi.object({
 
 // Certificate upload validation schema
 const certificateUploadSchema = Joi.object({
-  folderId: Joi.string().optional().allow(null)
+  folderId: Joi.string().optional().allow(null),
+  certificate: Joi.any().optional()
 });
 
 // Folder creation validation schema
@@ -53,7 +54,7 @@ export const validateRegister = (req, res, next) => {
 };
 
 export const validateCertificateUpload = (req, res, next) => {
-  const { error } = certificateUploadSchema.validate(req.body);
+  const { error } = certificateUploadSchema.validate(req.body, { allowUnknown: true });
   if (error) {
     return res.status(400).json({ 
       error: 'Validation error', 

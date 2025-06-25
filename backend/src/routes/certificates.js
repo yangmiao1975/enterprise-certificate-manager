@@ -102,13 +102,15 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', upload.single('certificate'), validateCertificateUpload, async (req, res, next) => {
   try {
     const db = getDatabase();
-    const { folderId } = req.body;
+    const { folderId } = req.body || {};
     const file = req.file;
     const userId = req.user.id;
 
     if (!file) {
       return res.status(400).json({ error: 'Certificate file is required' });
     }
+
+    console.log('file:', file, 'isFile:', file instanceof File);
 
     // Parse certificate (pass buffer and originalname)
     const certificateData = await parseCertificate(file.buffer, file.originalname);
@@ -164,7 +166,8 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
     console.log('Fetched certificate after insert:', certificate);
     res.status(201).json(certificate);
   } catch (error) {
-    next(error);
+    console.error('Certificate upload error:', error);
+    res.status(400).json({ error: error.message || 'Unknown error during certificate upload' });
   }
 });
 

@@ -14,10 +14,7 @@ const createApiClient = (): AxiosInstance => {
   
   const client = axios.create({
     baseURL: `${baseURL}/api`,
-    timeout: 30000,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    timeout: 30000
   });
 
   // Add auth token to requests
@@ -109,11 +106,7 @@ class RealApiService implements ApiService {
       formData.append('folderId', folderId);
     }
 
-    const response = await this.client.post('/certificates', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await this.client.post('/certificates', formData);
     return response.data;
   }
 

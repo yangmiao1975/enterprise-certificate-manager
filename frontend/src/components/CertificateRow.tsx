@@ -14,7 +14,11 @@ interface CertificateRowProps {
 }
 
 const CertificateRow: React.FC<CertificateRowProps> = ({ certificate, onRenew, onDownload, onViewDetails, onDelete, onMoveToFolder, isRenewing }) => {
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  };
 
   const getStatusClasses = (status: CertificateStatus) => {
     switch (status) {

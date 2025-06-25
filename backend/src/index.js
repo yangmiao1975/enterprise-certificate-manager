@@ -39,10 +39,6 @@ app.use(cors({
 // Logging middleware
 app.use(morgan('combined'));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
 // Static files
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
@@ -61,6 +57,10 @@ app.use('/api/certificates', authMiddleware, certificateRoutes);
 app.use('/api/folders', authMiddleware, folderRoutes);
 app.use('/api/metadata', authMiddleware, metadataRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
+
+// Body parsing middleware (must come after file upload routes)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Error handling middleware
 app.use(errorHandler);

@@ -38,6 +38,7 @@ const UploadCertificateForm: React.FC<UploadCertificateFormProps> = ({ onSubmit,
     setError('');
     setIsUploading(true);
     try {
+      console.log('selectedFile:', selectedFile, 'isFile:', selectedFile instanceof File);
       await onSubmit(selectedFile, selectedFolderId);
     } catch (submitError: any) {
       console.error("Upload submission error:", submitError);

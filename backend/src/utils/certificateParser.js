@@ -17,8 +17,14 @@ export async function parseCertificate(fileContent, originalName = "") {
     }
 
     const cert = new X509Certificate(der);
-    // console.log('subjectAltName:', cert.subjectAltName);
-    // console.log('cert:', cert);
+    // Debug logging for certificate fields
+    console.log(`[parseCertificate] File: ${originalName}`);
+    console.log('  subject:', cert.subject);
+    console.log('  issuer:', cert.issuer);
+    console.log('  notBefore:', cert.notBefore, 'isValid:', cert.notBefore instanceof Date && !isNaN(cert.notBefore));
+    console.log('  notAfter:', cert.notAfter, 'isValid:', cert.notAfter instanceof Date && !isNaN(cert.notAfter));
+    console.log('  serialNumber:', cert.serialNumber);
+    console.log('  publicKey algorithm:', cert.publicKey?.algorithm?.name);
 
     // Try to get CN, fallback to parsing subject, then to first DNS SAN from subjectAltName
     let commonName = cert.subjectCommonName;
@@ -43,14 +49,14 @@ export async function parseCertificate(fileContent, originalName = "") {
       commonName: commonName || 'Unknown',
       issuer: cert.issuer,
       subject: cert.subject,
-      validFrom: cert.notBefore.toISOString(),
-      validTo: cert.notAfter.toISOString(),
+      validFrom: cert.notBefore instanceof Date && !isNaN(cert.notBefore) ? cert.notBefore.toISOString() : null,
+      validTo: cert.notAfter instanceof Date && !isNaN(cert.notAfter) ? cert.notAfter.toISOString() : null,
       algorithm: cert.publicKey?.algorithm?.name || 'Unknown',
       serialNumber: cert.serialNumber,
       status: calculateStatus(cert.notAfter),
     };
   } catch (error) {
-    console.error('Error parsing certificate:', error);
+    console.error(`[parseCertificate] Error parsing certificate (${originalName}):`, error);
     throw new Error('Invalid or unsupported certificate format. This parser supports PEM/DER X.509 certificates with RSA, EC, Ed25519, and more.');
   }
 }
