@@ -59,4 +59,7 @@ steps:
         '--set-secrets', 'VITE_API_URL=certificate-manager-frontend-api-url:latest,VITE_ENVIRONMENT=certificate-manager-frontend-env:latest'
       ]
 
-timeout: 1200s 
+timeout: 1200s
+
+options:
+  logging: CLOUD_LOGGING_ONLY 
