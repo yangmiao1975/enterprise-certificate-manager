@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+dist
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+.env
+.env.*
+*.md
+*.log
+frontend/node_modules
+backend/node_modules
+frontend/dist
+backend/data
+backend/uploads
+backend/logs 
