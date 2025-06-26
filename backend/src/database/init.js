@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import { promisify } from 'util';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -32,20 +33,28 @@ export function getDatabase() {
   if (!db) {
     throw new Error('Database not initialized. Call initializeDatabase() first.');
   }
+  // Add promisified helpers
+  db.getAsync = promisify(db.get).bind(db);
+  db.allAsync = promisify(db.all).bind(db);
+  db.runAsync = promisify(db.run).bind(db);
   return db;
 }
 
 async function createTables() {
-  // Users table
+  // Users table (hybrid: supports Google OAuth and password login)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      google_id TEXT UNIQUE,                -- For Google OAuth users (nullable for password users)
+      username TEXT UNIQUE,                 -- For password users (nullable for Google users)
+      email TEXT UNIQUE NOT NULL,           -- Always required
+      password_hash TEXT,                   -- For password users (nullable for Google users)
+      display_name TEXT,
+      avatar TEXT,
+      role TEXT NOT NULL DEFAULT 'viewer',
       active BOOLEAN DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -154,8 +163,8 @@ async function initializeDefaultData() {
   const passwordHash = await bcrypt.default.hash('admin123', 10);
   
   await db.run(
-    'INSERT OR IGNORE INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-    ['admin-user', 'admin', 'admin@example.com', passwordHash, 'admin', 1]
+    'INSERT OR IGNORE INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
+    ['admin', 'admin@example.com', passwordHash, 'admin', 1]
   );
 
   // Insert default folders

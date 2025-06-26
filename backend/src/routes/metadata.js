@@ -9,11 +9,11 @@ router.get('/', async (req, res, next) => {
   try {
     const db = getDatabase();
     
-    const metadata = await db.get('SELECT value FROM metadata WHERE key = ?', ['system_config']);
+    const metadata = await db.getAsync('SELECT value FROM metadata WHERE key = ?', ['system_config']);
     const config = metadata ? JSON.parse(metadata.value) : {};
 
     // Get additional system info
-    const stats = await db.get(`
+    const stats = await db.getAsync(`
       SELECT 
         (SELECT COUNT(*) FROM certificates) as total_certificates,
         (SELECT COUNT(*) FROM certificates WHERE status = 'EXPIRED') as expired_certificates,
@@ -37,7 +37,7 @@ router.put('/', requirePermission('system:settings'), async (req, res, next) => 
     const db = getDatabase();
     const { tempFolder, system } = req.body;
 
-    const currentMetadata = await db.get('SELECT value FROM metadata WHERE key = ?', ['system_config']);
+    const currentMetadata = await db.getAsync('SELECT value FROM metadata WHERE key = ?', ['system_config']);
     const currentConfig = currentMetadata ? JSON.parse(currentMetadata.value) : {};
 
     const updatedConfig = {
@@ -46,9 +46,9 @@ router.put('/', requirePermission('system:settings'), async (req, res, next) => 
       system: system || currentConfig.system
     };
 
-    await db.run(
-      'INSERT OR REPLACE INTO metadata (key, value, updated_at) VALUES (?, ?, ?)',
-      ['system_config', JSON.stringify(updatedConfig), new Date().toISOString()]
+    await db.runAsync(
+      'UPDATE metadata SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?',
+      [JSON.stringify(updatedConfig), 'system_config']
     );
 
     res.json(updatedConfig);
@@ -62,7 +62,7 @@ router.get('/stats', async (req, res, next) => {
   try {
     const db = getDatabase();
     
-    const stats = await db.get(`
+    const stats = await db.getAsync(`
       SELECT 
         (SELECT COUNT(*) FROM certificates) as total_certificates,
         (SELECT COUNT(*) FROM certificates WHERE status = 'VALID') as valid_certificates,
@@ -75,14 +75,14 @@ router.get('/stats', async (req, res, next) => {
     `);
 
     // Get certificates by status for chart
-    const statusBreakdown = await db.all(`
+    const statusBreakdown = await db.allAsync(`
       SELECT status, COUNT(*) as count
       FROM certificates
       GROUP BY status
     `);
 
     // Get certificates by month for trend
-    const monthlyTrend = await db.all(`
+    const monthlyTrend = await db.allAsync(`
       SELECT 
         strftime('%Y-%m', uploaded_at) as month,
         COUNT(*) as count
@@ -108,13 +108,13 @@ router.get('/health', async (req, res, next) => {
     const db = getDatabase();
     
     // Check database connectivity
-    const dbHealth = await db.get('SELECT 1 as health');
+    const dbHealth = await db.getAsync('SELECT 1 as health');
     
     // Check for expired certificates
-    const expiredCount = await db.get('SELECT COUNT(*) as count FROM certificates WHERE status = "EXPIRED"');
+    const expiredCount = await db.getAsync('SELECT COUNT(*) as count FROM certificates WHERE status = "EXPIRED"');
     
     // Check for certificates expiring soon
-    const expiringSoonCount = await db.get('SELECT COUNT(*) as count FROM certificates WHERE status = "EXPIRING_SOON"');
+    const expiringSoonCount = await db.getAsync('SELECT COUNT(*) as count FROM certificates WHERE status = "EXPIRING_SOON"');
 
     const health = {
       status: 'healthy',
@@ -137,6 +137,27 @@ router.get('/health', async (req, res, next) => {
       timestamp: new Date().toISOString(),
       error: error.message
     });
+  }
+});
+
+router.get('/me', requirePermission('system:settings'), async (req, res, next) => {
+  // console.log('HIT /api/auth/me route');
+  try {
+    const db = getDatabase();
+    // console.log('req.user:', req.user);
+    const user = await db.getAsync('SELECT id, username, email, role, avatar FROM users WHERE id = ?', [req.user.id]);
+    // console.log('Queried user:', user);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [user.role]);
+    const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
+    res.json({
+      ...user,
+      permissions
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

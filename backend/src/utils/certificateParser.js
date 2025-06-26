@@ -7,8 +7,8 @@ export async function parseCertificate(fileContent, originalName = "") {
     if (contentStr.includes('-----BEGIN CERTIFICATE-----')) {
       // PEM: strip header/footer and decode base64
       let pem = contentStr
-        .replace(/-----BEGIN CERTIFICATE-----/, '')
-        .replace(/-----END CERTIFICATE-----/, '')
+      .replace(/-----BEGIN CERTIFICATE-----/, '')
+      .replace(/-----END CERTIFICATE-----/, '')
         .replace(/\r?\n|\r/g, '');
       der = Buffer.from(pem, 'base64');
     } else {
@@ -18,13 +18,13 @@ export async function parseCertificate(fileContent, originalName = "") {
 
     const cert = new X509Certificate(der);
     // Debug logging for certificate fields
-    console.log(`[parseCertificate] File: ${originalName}`);
-    console.log('  subject:', cert.subject);
-    console.log('  issuer:', cert.issuer);
-    console.log('  notBefore:', cert.notBefore, 'isValid:', cert.notBefore instanceof Date && !isNaN(cert.notBefore));
-    console.log('  notAfter:', cert.notAfter, 'isValid:', cert.notAfter instanceof Date && !isNaN(cert.notAfter));
-    console.log('  serialNumber:', cert.serialNumber);
-    console.log('  publicKey algorithm:', cert.publicKey?.algorithm?.name);
+    // console.log(`[parseCertificate] File: ${originalName}`);
+    // console.log('  subject:', cert.subject);
+    // console.log('  issuer:', cert.issuer);
+    // console.log('  notBefore:', cert.notBefore, 'isValid:', cert.notBefore instanceof Date && !isNaN(cert.notBefore));
+    // console.log('  notAfter:', cert.notAfter, 'isValid:', cert.notAfter instanceof Date && !isNaN(cert.notAfter));
+    // console.log('  serialNumber:', cert.serialNumber);
+    // console.log('  publicKey algorithm:', cert.publicKey?.algorithm?.name);
 
     // Try to get CN, fallback to parsing subject, then to first DNS SAN from subjectAltName
     let commonName = cert.subjectCommonName;

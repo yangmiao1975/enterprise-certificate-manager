@@ -9,6 +9,7 @@ import {
   loadMetadata,
   getRBACConfig
 } from './metadataService';
+import { apiService } from './apiService';
 
 let currentUser: User | null = null;
 let currentUserRole: Role | null = null;
@@ -58,25 +59,18 @@ export const logout = (): void => {
   localStorage.removeItem('currentUser');
 };
 
-export const getCurrentUser = (): User | null => {
-  if (!currentUser) {
-    // Try to restore from localStorage
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser) as User;
-        const role = getRoleById(user.role);
-        if (role) {
-          currentUser = user;
-          currentUserRole = role;
-        }
-      } catch (error) {
-        console.error('Failed to restore user from localStorage:', error);
-        localStorage.removeItem('currentUser');
-      }
-    }
+export const getCurrentUser = async (): Promise<User | null> => {
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  try {
+    const user = await apiService.getCurrentUser();
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    return user;
+  } catch (e) {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    return null;
   }
-  return currentUser;
 };
 
 export const getCurrentUserRole = (): Role | null => {

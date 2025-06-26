@@ -11,20 +11,25 @@ export const authMiddleware = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // console.log('Decoded JWT:', decoded);
     
     const db = getDatabase();
-    const user = await db.get('SELECT * FROM users WHERE id = ? AND active = 1', [decoded.userId]);
+    const allUsers = await db.allAsync('SELECT id, email, active FROM users');
+    // console.log('All users in DB:', allUsers);
+    const user = await db.getAsync('SELECT * FROM users WHERE id = ? AND active = 1', [decoded.id]);
+    // console.log('User from DB:', user);
     
     if (!user) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
     // Get user role and permissions
-    const role = await db.get('SELECT * FROM roles WHERE id = ?', [user.role]);
+    const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [user.role]);
     const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
 
     req.user = {
       ...user,
+      id: user.id,
       permissions
     };
 

@@ -1,8 +1,10 @@
+console.log('TOP LEVEL LOG: index.js is running');
+
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -44,6 +46,7 @@ app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  console.log('HIT /health route');
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
@@ -51,16 +54,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// File upload route (Multer needs to run before body parsers)
+app.use('/api/certificates', authMiddleware, certificateRoutes);
+
+// Body parsing middleware (for JSON and urlencoded)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/certificates', authMiddleware, certificateRoutes);
 app.use('/api/folders', authMiddleware, folderRoutes);
 app.use('/api/metadata', authMiddleware, metadataRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
-
-// Body parsing middleware (must come after file upload routes)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
 
 // Error handling middleware
 app.use(errorHandler);
@@ -75,6 +80,8 @@ async function startServer() {
   try {
     await initializeDatabase();
     console.log('Database initialized successfully');
+    
+    console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
     
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

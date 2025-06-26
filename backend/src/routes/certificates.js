@@ -61,13 +61,7 @@ router.get('/', async (req, res, next) => {
 
     query += ' ORDER BY c.uploaded_at DESC';
 
-    const certificates = await new Promise((resolve, reject) => {
-      db.all(query, params, (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      });
-    });
-    console.log('certificates:', certificates);
+    const certificates = await db.allAsync(query, params);
     res.json(certificates);
   } catch (error) {
     next(error);
@@ -80,7 +74,7 @@ router.get('/:id', async (req, res, next) => {
     const db = getDatabase();
     const { id } = req.params;
     
-    const certificate = await db.get(`
+    const certificate = await db.getAsync(`
       SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
       FROM certificates c
       LEFT JOIN folders f ON c.folder_id = f.id
@@ -110,11 +104,8 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
       return res.status(400).json({ error: 'Certificate file is required' });
     }
 
-    console.log('file:', file, 'isFile:', file instanceof File);
-
     // Parse certificate (pass buffer and originalname)
     const certificateData = await parseCertificate(file.buffer, file.originalname);
-    console.log('Parsed certificate data:', certificateData);
     const pemContent = file.buffer.toString('utf8');
 
     // Create certificate in GCP
@@ -124,49 +115,45 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
     const certificateId = uuidv4();
     const now = new Date().toISOString();
     try {
-      await db.run(`
-        INSERT INTO certificates (
-          id, common_name, issuer, subject, valid_from, valid_to, 
-          algorithm, serial_number, status, pem_content, folder_id, 
-          uploaded_by, uploaded_at, gcp_certificate_name
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        certificateId,
-        certificateData.commonName,
-        certificateData.issuer,
-        certificateData.subject,
-        certificateData.validFrom,
-        certificateData.validTo,
-        certificateData.algorithm,
-        certificateData.serialNumber,
-        certificateData.status,
-        pemContent,
-        folderId || null,
-        userId,
-        now,
-        gcpResult.gcpCertificateName
-      ]);
-      console.log('Inserted certificate into DB:', certificateId);
+    await db.runAsync(`
+      INSERT INTO certificates (
+        id, common_name, issuer, subject, valid_from, valid_to, 
+        algorithm, serial_number, status, pem_content, folder_id, 
+        uploaded_by, uploaded_at, gcp_certificate_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      certificateId,
+      certificateData.commonName,
+      certificateData.issuer,
+      certificateData.subject,
+      certificateData.validFrom,
+      certificateData.validTo,
+      certificateData.algorithm,
+      certificateData.serialNumber,
+      certificateData.status,
+      pemContent,
+      folderId || null,
+      userId,
+      now,
+      gcpResult.gcpCertificateName
+    ]);
     } catch (insertError) {
-      console.error('Error inserting certificate into DB:', insertError);
     }
 
     const certificate = await new Promise((resolve, reject) => {
-      db.get(`
-        SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
-        FROM certificates c
-        LEFT JOIN folders f ON c.folder_id = f.id
-        LEFT JOIN users u ON c.uploaded_by = u.id
-        WHERE c.id = ?
+      db.getAsync(`
+      SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
+      FROM certificates c
+      LEFT JOIN folders f ON c.folder_id = f.id
+      LEFT JOIN users u ON c.uploaded_by = u.id
+      WHERE c.id = ?
       `, [certificateId], (err, row) => {
         if (err) return reject(err);
         resolve(row);
       });
     });
-    console.log('Fetched certificate after insert:', certificate);
     res.status(201).json(certificate);
   } catch (error) {
-    console.error('Certificate upload error:', error);
     res.status(400).json({ error: error.message || 'Unknown error during certificate upload' });
   }
 });
@@ -177,7 +164,7 @@ router.get('/:id/download', async (req, res, next) => {
     const { id } = req.params;
     const db = getDatabase();
     
-    const certificate = await db.get('SELECT * FROM certificates WHERE id = ?', [id]);
+    const certificate = await db.getAsync('SELECT * FROM certificates WHERE id = ?', [id]);
     if (!certificate) {
       return res.status(404).json({ error: 'Certificate not found' });
     }
@@ -209,7 +196,7 @@ router.delete('/:id', async (req, res, next) => {
     const { id } = req.params;
     const db = getDatabase();
     
-    const certificate = await db.get('SELECT * FROM certificates WHERE id = ?', [id]);
+    const certificate = await db.getAsync('SELECT * FROM certificates WHERE id = ?', [id]);
     if (!certificate) {
       return res.status(404).json({ error: 'Certificate not found' });
     }
@@ -224,7 +211,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     // Delete from database
-    await db.run('DELETE FROM certificates WHERE id = ?', [id]);
+    await db.runAsync('DELETE FROM certificates WHERE id = ?', [id]);
 
     res.json({ message: 'Certificate deleted successfully' });
   } catch (error) {
@@ -238,7 +225,7 @@ router.post('/:id/renew', async (req, res, next) => {
     const { id } = req.params;
     const db = getDatabase();
     
-    const certificate = await db.get('SELECT * FROM certificates WHERE id = ?', [id]);
+    const certificate = await db.getAsync('SELECT * FROM certificates WHERE id = ?', [id]);
     if (!certificate) {
       return res.status(404).json({ error: 'Certificate not found' });
     }
@@ -265,14 +252,14 @@ router.patch('/:id/folder', async (req, res, next) => {
     const { folderId } = req.body;
     const db = getDatabase();
     
-    const certificate = await db.get('SELECT * FROM certificates WHERE id = ?', [id]);
+    const certificate = await db.getAsync('SELECT * FROM certificates WHERE id = ?', [id]);
     if (!certificate) {
       return res.status(404).json({ error: 'Certificate not found' });
     }
 
-    await db.run('UPDATE certificates SET folder_id = ? WHERE id = ?', [folderId, id]);
+    await db.runAsync('UPDATE certificates SET folder_id = ? WHERE id = ?', [folderId, id]);
 
-    const updatedCertificate = await db.get(`
+    const updatedCertificate = await db.getAsync(`
       SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
       FROM certificates c
       LEFT JOIN folders f ON c.folder_id = f.id

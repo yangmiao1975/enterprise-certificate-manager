@@ -10,7 +10,7 @@ router.get('/', requirePermission('system:settings'), async (req, res, next) => 
   try {
     const db = getDatabase();
     
-    const users = await db.all(`
+    const users = await db.allAsync(`
       SELECT u.id, u.username, u.email, u.role, u.active, u.created_at,
              r.name as role_name, r.description as role_description
       FROM users u
@@ -30,7 +30,7 @@ router.get('/:id', requirePermission('system:settings'), async (req, res, next) 
     const db = getDatabase();
     const { id } = req.params;
     
-    const user = await db.get(`
+    const user = await db.getAsync(`
       SELECT u.id, u.username, u.email, u.role, u.active, u.created_at,
              r.name as role_name, r.description as role_description
       FROM users u
@@ -55,7 +55,7 @@ router.post('/', requirePermission('system:settings'), async (req, res, next) =>
     const { username, email, password, role } = req.body;
 
     // Check if user already exists
-    const existingUser = await db.get('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
+    const existingUser = await db.getAsync('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
@@ -65,12 +65,12 @@ router.post('/', requirePermission('system:settings'), async (req, res, next) =>
 
     // Create user
     const userId = `user-${Date.now()}`;
-    await db.run(
+    await db.runAsync(
       'INSERT INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
       [userId, username, email, passwordHash, role || 'viewer', 1]
     );
 
-    const newUser = await db.get(`
+    const newUser = await db.getAsync(`
       SELECT u.id, u.username, u.email, u.role, u.active, u.created_at,
              r.name as role_name, r.description as role_description
       FROM users u
@@ -92,14 +92,14 @@ router.put('/:id', requirePermission('system:settings'), async (req, res, next) 
     const { username, email, role, active } = req.body;
 
     // Check if user exists
-    const existingUser = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    const existingUser = await db.getAsync('SELECT * FROM users WHERE id = ?', [id]);
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // Check if new username/email conflicts
     if (username !== existingUser.username || email !== existingUser.email) {
-      const conflict = await db.get(
+      const conflict = await db.getAsync(
         'SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?',
         [username, email, id]
       );
@@ -109,12 +109,12 @@ router.put('/:id', requirePermission('system:settings'), async (req, res, next) 
     }
 
     // Update user
-    await db.run(
+    await db.runAsync(
       'UPDATE users SET username = ?, email = ?, role = ?, active = ? WHERE id = ?',
       [username, email, role, active ? 1 : 0, id]
     );
 
-    const updatedUser = await db.get(`
+    const updatedUser = await db.getAsync(`
       SELECT u.id, u.username, u.email, u.role, u.active, u.created_at,
              r.name as role_name, r.description as role_description
       FROM users u
@@ -135,7 +135,7 @@ router.delete('/:id', requirePermission('system:settings'), async (req, res, nex
     const { id } = req.params;
 
     // Check if user exists
-    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    const user = await db.getAsync('SELECT * FROM users WHERE id = ?', [id]);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -146,7 +146,7 @@ router.delete('/:id', requirePermission('system:settings'), async (req, res, nex
     }
 
     // Check if user has uploaded certificates
-    const certificateCount = await db.get('SELECT COUNT(*) as count FROM certificates WHERE uploaded_by = ?', [id]);
+    const certificateCount = await db.getAsync('SELECT COUNT(*) as count FROM certificates WHERE uploaded_by = ?', [id]);
     if (certificateCount.count > 0) {
       return res.status(400).json({ 
         error: 'Cannot delete user with uploaded certificates',
@@ -154,7 +154,7 @@ router.delete('/:id', requirePermission('system:settings'), async (req, res, nex
       });
     }
 
-    await db.run('DELETE FROM users WHERE id = ?', [id]);
+    await db.runAsync('DELETE FROM users WHERE id = ?', [id]);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -167,7 +167,7 @@ router.get('/roles/list', async (req, res, next) => {
   try {
     const db = getDatabase();
     
-    const roles = await db.all('SELECT * FROM roles ORDER BY name');
+    const roles = await db.allAsync('SELECT * FROM roles ORDER BY name');
     res.json(roles);
   } catch (error) {
     next(error);
@@ -179,7 +179,7 @@ router.get('/me/permissions', async (req, res, next) => {
   try {
     const db = getDatabase();
     
-    const role = await db.get('SELECT * FROM roles WHERE id = ?', [req.user.role]);
+    const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [req.user.role]);
     const permissions = role ? JSON.parse(role.permissions) : [];
 
     res.json({

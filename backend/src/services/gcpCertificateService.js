@@ -141,7 +141,7 @@ class GCPCertificateService {
             enabled: true
           }
         });
-        console.log(`Created bucket: ${bucketName}`);
+        // console.log(`Created bucket: ${bucketName}`);
       }
     } catch (error) {
       console.error('Error ensuring bucket exists:', error);

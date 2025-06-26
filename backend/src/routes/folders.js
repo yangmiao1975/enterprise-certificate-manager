@@ -28,7 +28,7 @@ router.get('/', async (req, res, next) => {
 
     query += ' ORDER BY f.created_at DESC';
 
-    const folders = await db.all(query, params);
+    const folders = await db.allAsync(query, params);
     res.json(folders);
   } catch (error) {
     next(error);
@@ -41,7 +41,7 @@ router.get('/:id', validateId, async (req, res, next) => {
     const db = getDatabase();
     const { id } = req.params;
     
-    const folder = await db.get(`
+    const folder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username,
              (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count
       FROM folders f
@@ -67,7 +67,7 @@ router.post('/', validateFolder, requirePermission('folders:write'), async (req,
     const userId = req.user.id;
 
     // Check if folder name already exists
-    const existingFolder = await db.get('SELECT id FROM folders WHERE name = ?', [name]);
+    const existingFolder = await db.getAsync('SELECT id FROM folders WHERE name = ?', [name]);
     if (existingFolder) {
       return res.status(400).json({ error: 'Folder with this name already exists' });
     }
@@ -75,7 +75,7 @@ router.post('/', validateFolder, requirePermission('folders:write'), async (req,
     const folderId = uuidv4();
     const now = new Date().toISOString();
 
-    await db.run(`
+    await db.runAsync(`
       INSERT INTO folders (id, name, description, type, permissions, created_by, created_at, access_control)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
@@ -89,7 +89,7 @@ router.post('/', validateFolder, requirePermission('folders:write'), async (req,
       accessControl ? JSON.stringify(accessControl) : null
     ]);
 
-    const folder = await db.get(`
+    const folder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username
       FROM folders f
       LEFT JOIN users u ON f.created_by = u.id
@@ -110,20 +110,20 @@ router.put('/:id', validateId, validateFolder, requirePermission('folders:write'
     const { name, description, permissions, accessControl } = req.body;
 
     // Check if folder exists
-    const existingFolder = await db.get('SELECT * FROM folders WHERE id = ?', [id]);
+    const existingFolder = await db.getAsync('SELECT * FROM folders WHERE id = ?', [id]);
     if (!existingFolder) {
       return res.status(404).json({ error: 'Folder not found' });
     }
 
     // Check if new name conflicts with existing folder
     if (name !== existingFolder.name) {
-      const nameConflict = await db.get('SELECT id FROM folders WHERE name = ? AND id != ?', [name, id]);
+      const nameConflict = await db.getAsync('SELECT id FROM folders WHERE name = ? AND id != ?', [name, id]);
       if (nameConflict) {
         return res.status(400).json({ error: 'Folder with this name already exists' });
       }
     }
 
-    await db.run(`
+    await db.runAsync(`
       UPDATE folders 
       SET name = ?, description = ?, permissions = ?, access_control = ?
       WHERE id = ?
@@ -135,7 +135,7 @@ router.put('/:id', validateId, validateFolder, requirePermission('folders:write'
       id
     ]);
 
-    const updatedFolder = await db.get(`
+    const updatedFolder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username
       FROM folders f
       LEFT JOIN users u ON f.created_by = u.id
@@ -155,7 +155,7 @@ router.delete('/:id', validateId, requirePermission('folders:delete'), async (re
     const { id } = req.params;
 
     // Check if folder exists
-    const folder = await db.get('SELECT * FROM folders WHERE id = ?', [id]);
+    const folder = await db.getAsync('SELECT * FROM folders WHERE id = ?', [id]);
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' });
     }
@@ -166,7 +166,7 @@ router.delete('/:id', validateId, requirePermission('folders:delete'), async (re
     }
 
     // Check if folder has certificates
-    const certificateCount = await db.get('SELECT COUNT(*) as count FROM certificates WHERE folder_id = ?', [id]);
+    const certificateCount = await db.getAsync('SELECT COUNT(*) as count FROM certificates WHERE folder_id = ?', [id]);
     if (certificateCount.count > 0) {
       return res.status(400).json({ 
         error: 'Cannot delete folder with certificates',
@@ -174,7 +174,7 @@ router.delete('/:id', validateId, requirePermission('folders:delete'), async (re
       });
     }
 
-    await db.run('DELETE FROM folders WHERE id = ?', [id]);
+    await db.runAsync('DELETE FROM folders WHERE id = ?', [id]);
 
     res.json({ message: 'Folder deleted successfully' });
   } catch (error) {
@@ -211,7 +211,7 @@ router.get('/:id/certificates', validateId, async (req, res, next) => {
 
     query += ' ORDER BY c.uploaded_at DESC';
 
-    const certificates = await db.all(query, params);
+    const certificates = await db.allAsync(query, params);
     res.json(certificates);
   } catch (error) {
     next(error);

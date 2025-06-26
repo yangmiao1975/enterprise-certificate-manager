@@ -13,6 +13,9 @@ import CreateEditFolderModal from './components/modals/CreateEditFolderModal';
 import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal';
 import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal';
 import Login from './components/Login';
+import OAuthSuccess from './components/OAuthSuccess';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
 
 import { Certificate, NotificationMessage, CertificateStatus, NotificationSettings, Folder } from './types';
 import { 
@@ -33,7 +36,7 @@ import { ICONS, DEFAULT_NOTIFICATION_SETTINGS, ALL_CERTIFICATES_FOLDER_ID } from
 
 const isAuthenticated = () => !!localStorage.getItem('authToken');
 
-const App: React.FC = () => {
+const MainApp: React.FC = () => {
   // All hooks must be called unconditionally at the top
   const [loggedIn, setLoggedIn] = useState(isAuthenticated());
   const [allCertificates, setAllCertificates] = useState<Certificate[]>([]);
@@ -134,20 +137,14 @@ Enterprise Certificate Manager (Simulated Email System)`;
     }
   }, [sendSimulatedEmail]);
 
-  // Initialize system metadata and authentication
+  // Initialize system metadata and authentication (no user fetch here)
   useEffect(() => {
     const initializeSystem = async () => {
       try {
         // Load metadata first
         await loadMetadata();
-        
         // Initialize authentication
         await initializeAuth();
-        
-        // Set current user
-        const user = getCurrentUser();
-        setCurrentUser(user);
-        
         setIsSystemInitialized(true);
         addNotification('System initialized successfully with RBAC and metadata', 'success');
       } catch (error) {
@@ -155,9 +152,30 @@ Enterprise Certificate Manager (Simulated Email System)`;
         addNotification('Failed to initialize system metadata', 'error');
       }
     };
-
     initializeSystem();
   }, [addNotification]);
+
+  // Always fetch user info on mount and when authToken changes
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('authToken');
+      console.log('fetchUser called, token:', token);
+      if (token) {
+        const user = await getCurrentUser();
+        console.log('Fetched user:', user);
+        setCurrentUser(user);
+        setLoggedIn(!!user);
+      } else {
+        setCurrentUser(null);
+        setLoggedIn(false);
+      }
+    };
+    fetchUser();
+    window.addEventListener('authTokenSet', fetchUser);
+    return () => {
+      window.removeEventListener('authTokenSet', fetchUser);
+    };
+  }, []);
 
   function mapCertificateApiToFrontend(cert: any): Certificate {
     return {
@@ -264,21 +282,21 @@ Enterprise Certificate Manager (Simulated Email System)`;
 
   const handleUploadCertificateFile = async (file: File, folderId: string | null): Promise<void> => {
     if (!file) {
-      addNotification('No file selected for upload.', 'error');
-      throw new Error('No file selected.');
-    }
-    try {
+        addNotification('No file selected for upload.', 'error');
+        throw new Error('No file selected.');
+            }
+            try {
       console.log('file:', file, 'isFile:', file instanceof File);
       const newCertificateApi = await apiAddCertificate(file, folderId || undefined); // Pass File directly
       const newCertificate = mapCertificateApiToFrontend(newCertificateApi);
-      setAllCertificates(prevCerts => 
-        [newCertificate, ...prevCerts].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime())
-      );
-      addNotification(`Certificate ${newCertificate.commonName} (from ${file.name}) added successfully.`, 'success');
-      setIsUploadModalOpen(false);
+                setAllCertificates(prevCerts => 
+                  [newCertificate, ...prevCerts].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime())
+                );
+                addNotification(`Certificate ${newCertificate.commonName} (from ${file.name}) added successfully.`, 'success');
+                setIsUploadModalOpen(false);
       checkAndSendExpiryNotifications([newCertificate, ...allCertificates], notificationSettings);
-    } catch (err: any) {
-      addNotification(err.message || `Failed to add certificate from ${file.name}.`, 'error');
+            } catch (err: any) {
+                addNotification(err.message || `Failed to add certificate from ${file.name}.`, 'error');
       throw err;
     }
   };
@@ -292,10 +310,10 @@ Enterprise Certificate Manager (Simulated Email System)`;
     if (!certToDelete) return;
     try {
       await apiDeleteCertificate(certToDelete.id);
-      const certIdToDelete = certToDelete.id;
-      setAllCertificates(prevCerts => prevCerts.filter(c => c.id !== certIdToDelete));
-      addNotification(`Certificate ${certToDelete.commonName} deleted.`, 'success');
-      checkAndSendExpiryNotifications(allCertificates.filter(c => c.id !== certIdToDelete), notificationSettings);
+        const certIdToDelete = certToDelete.id;
+        setAllCertificates(prevCerts => prevCerts.filter(c => c.id !== certIdToDelete));
+        addNotification(`Certificate ${certToDelete.commonName} deleted.`, 'success');
+        checkAndSendExpiryNotifications(allCertificates.filter(c => c.id !== certIdToDelete), notificationSettings);
     } catch (err) {
       addNotification(`Error deleting cert ${certToDelete.commonName}.`, 'error');
     } finally {
@@ -408,7 +426,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
     let current: Folder | undefined = folders.find(f => f.id === folderId);
     while (current && current.parentId) {
       if (current.parentId === possibleAncestorId) return true;
-      const next: Folder | undefined = folders.find(f => f.id === current.parentId);
+      const next: Folder | undefined = folders.find(f => f.id === current?.parentId);
       if (!next) break;
       current = next;
     }
@@ -425,11 +443,6 @@ Enterprise Certificate Manager (Simulated Email System)`;
       )
     );
   };
-
-  // Only after all hooks, do conditional rendering
-  if (!loggedIn) {
-    return <Login onLogin={() => setLoggedIn(true)} />;
-  }
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-50">
@@ -568,6 +581,25 @@ Enterprise Certificate Manager (Simulated Email System)`;
         © {new Date().getFullYear()} Enterprise Certificate Manager. All rights reserved. (Simulated Application)
       </footer>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login onLogin={() => {}} />} />
+        <Route path="/oauth-success" element={<OAuthSuccess />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
   );
 };
 

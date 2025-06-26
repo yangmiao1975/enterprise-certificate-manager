@@ -49,6 +49,7 @@ export interface User {
   username: string;
   email: string;
   role: string;
+  avatar?: string; // Optional avatar URL from Google OAuth
   active: boolean;
   createdAt: string; // ISO Date string
 }
