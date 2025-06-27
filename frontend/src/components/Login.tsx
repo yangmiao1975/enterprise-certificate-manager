@@ -25,18 +25,6 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-8 rounded shadow-md w-80">
         <h2 className="text-2xl font-bold mb-6 text-center">Sign in</h2>
-        <a
-          href="/api/auth/google"
-          className="flex items-center justify-center w-full bg-white border border-gray-300 rounded shadow py-2 mb-6 hover:bg-gray-50 transition"
-        >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-2" />
-          <span className="font-medium text-gray-700">Continue with Google</span>
-        </a>
-        <div className="flex items-center my-4">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="mx-2 text-gray-400 text-sm">OR</span>
-          <div className="flex-grow border-t border-gray-300"></div>
-        </div>
         <form onSubmit={handleSubmit}>
           {error && <div className="text-red-500 mb-2">{error}</div>}
           <input
@@ -57,6 +45,18 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             Login
           </button>
         </form>
+        
+        <div className="mt-4 text-center">
+          <div className="text-gray-500 mb-2">or</div>
+          <a
+            href="/api/auth/google"
+            className="flex items-center justify-center w-full bg-white border border-gray-300 rounded shadow py-2 px-4 hover:bg-gray-50 transition"
+            style={{ textDecoration: 'none' }}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-2" />
+            <span className="font-medium text-gray-700">Continue with Google</span>
+          </a>
+        </div>
       </div>
     </div>
   );

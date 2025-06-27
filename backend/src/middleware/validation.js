@@ -26,9 +26,10 @@ const folderSchema = Joi.object({
   description: Joi.string().optional().max(500),
   permissions: Joi.array().items(Joi.string().valid('read', 'write', 'delete')).default(['read']),
   accessControl: Joi.object({
-    roles: Joi.array().items(Joi.string()),
-    users: Joi.array().items(Joi.string())
-  }).optional()
+    roles: Joi.array().items(Joi.string()).optional(),
+    users: Joi.array().items(Joi.string()).optional()
+  }).optional(),
+  parentId: Joi.string().optional().allow(null)
 });
 
 export const validateLogin = (req, res, next) => {

@@ -12,15 +12,15 @@
     "build:docker": "npm run build"
   },
   "dependencies": {
-    "@google-cloud/certificate-manager": "^2.0.0",
-    "@google-cloud/storage": "^7.7.0",
-    "@peculiar/x509": "^1.12.4",
+    "@google-cloud/certificate-manager": "^3.0.0",
+    "@google-cloud/storage": "^7.13.0",
+    "@peculiar/x509": "^1.13.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^4.18.2",
-    "helmet": "^7.1.0",
-    "joi": "^17.11.0",
+    "dotenv": "^16.5.1",
+    "express": "^4.19.2",
+    "helmet": "^7.1.2",
+    "joi": "^17.12.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "nodemon": "^3.0.2",
+    "nodemon": "^3.0.3",
     "supertest": "^6.3.3"
   },
   "engines": {

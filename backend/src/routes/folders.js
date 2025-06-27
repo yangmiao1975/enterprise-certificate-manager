@@ -14,9 +14,11 @@ router.get('/', async (req, res, next) => {
     
     let query = `
       SELECT f.*, u.username as created_by_username,
-             (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count
+             (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
+             pf.name as parent_name
       FROM folders f
       LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN folders pf ON f.parent_id = pf.id
       WHERE 1=1
     `;
     const params = [];
@@ -43,9 +45,11 @@ router.get('/:id', validateId, async (req, res, next) => {
     
     const folder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username,
-             (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count
+             (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
+             pf.name as parent_name
       FROM folders f
       LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN folders pf ON f.parent_id = pf.id
       WHERE f.id = ?
     `, [id]);
 
@@ -63,21 +67,41 @@ router.get('/:id', validateId, async (req, res, next) => {
 router.post('/', validateFolder, requirePermission('folders:write'), async (req, res, next) => {
   try {
     const db = getDatabase();
-    const { name, description, permissions, accessControl } = req.body;
+    const { name, description, permissions, accessControl, parentId } = req.body;
     const userId = req.user.id;
+    
+    console.log('[Backend] Folder creation request:', { name, parentId, userId });
 
-    // Check if folder name already exists
-    const existingFolder = await db.getAsync('SELECT id FROM folders WHERE name = ?', [name]);
+    // Check if folder name already exists in the same parent
+    let nameCheckQuery = 'SELECT id FROM folders WHERE name = ?';
+    let nameCheckParams = [name];
+    
+    if (parentId) {
+      nameCheckQuery += ' AND parent_id = ?';
+      nameCheckParams.push(parentId);
+    } else {
+      nameCheckQuery += ' AND parent_id IS NULL';
+    }
+    
+    const existingFolder = await db.getAsync(nameCheckQuery, nameCheckParams);
     if (existingFolder) {
-      return res.status(400).json({ error: 'Folder with this name already exists' });
+      return res.status(400).json({ error: 'Folder with this name already exists in the same location' });
+    }
+
+    // Validate parent folder exists if parentId is provided
+    if (parentId) {
+      const parentFolder = await db.getAsync('SELECT id FROM folders WHERE id = ?', [parentId]);
+      if (!parentFolder) {
+        return res.status(400).json({ error: 'Parent folder not found' });
+      }
     }
 
     const folderId = uuidv4();
     const now = new Date().toISOString();
 
     await db.runAsync(`
-      INSERT INTO folders (id, name, description, type, permissions, created_by, created_at, access_control)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO folders (id, name, description, type, permissions, created_by, created_at, access_control, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       folderId,
       name,
@@ -86,7 +110,8 @@ router.post('/', validateFolder, requirePermission('folders:write'), async (req,
       JSON.stringify(permissions || ['read']),
       userId,
       now,
-      accessControl ? JSON.stringify(accessControl) : null
+      accessControl ? JSON.stringify(accessControl) : null,
+      parentId || null
     ]);
 
     const folder = await db.getAsync(`
@@ -217,5 +242,94 @@ router.get('/:id/certificates', validateId, async (req, res, next) => {
     next(error);
   }
 });
+
+// Move folder to different parent
+router.patch('/:id/move', validateId, requirePermission('folders:write'), async (req, res, next) => {
+  try {
+    const db = getDatabase();
+    const { id } = req.params;
+    const { parentId } = req.body;
+
+    // Check if folder exists
+    const folder = await db.getAsync('SELECT * FROM folders WHERE id = ?', [id]);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    // Check if it's a system folder
+    if (folder.type === 'system') {
+      return res.status(400).json({ error: 'Cannot move system folders' });
+    }
+
+    // Validate parent folder exists if parentId is provided
+    if (parentId) {
+      const parentFolder = await db.getAsync('SELECT id FROM folders WHERE id = ?', [parentId]);
+      if (!parentFolder) {
+        return res.status(400).json({ error: 'Parent folder not found' });
+      }
+
+      // Prevent circular reference (folder cannot be its own descendant)
+      if (await wouldCreateCircularReference(db, id, parentId)) {
+        return res.status(400).json({ error: 'Cannot move folder: would create circular reference' });
+      }
+    }
+
+    // Check if folder name conflicts with siblings in new location
+    let nameCheckQuery = 'SELECT id FROM folders WHERE name = ? AND id != ?';
+    let nameCheckParams = [folder.name, id];
+    
+    if (parentId) {
+      nameCheckQuery += ' AND parent_id = ?';
+      nameCheckParams.push(parentId);
+    } else {
+      nameCheckQuery += ' AND parent_id IS NULL';
+    }
+    
+    const nameConflict = await db.getAsync(nameCheckQuery, nameCheckParams);
+    if (nameConflict) {
+      return res.status(400).json({ error: 'Folder with this name already exists in the destination location' });
+    }
+
+    // Move the folder
+    await db.runAsync('UPDATE folders SET parent_id = ? WHERE id = ?', [parentId || null, id]);
+
+    // Return updated folder with parent information
+    const updatedFolder = await db.getAsync(`
+      SELECT f.*, u.username as created_by_username,
+             (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
+             pf.name as parent_name
+      FROM folders f
+      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN folders pf ON f.parent_id = pf.id
+      WHERE f.id = ?
+    `, [id]);
+
+    res.json(updatedFolder);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Helper function to check for circular references
+async function wouldCreateCircularReference(db, folderId, newParentId) {
+  if (folderId === newParentId) {
+    return true;
+  }
+
+  let currentParentId = newParentId;
+  const visited = new Set();
+
+  while (currentParentId && !visited.has(currentParentId)) {
+    if (currentParentId === folderId) {
+      return true;
+    }
+    
+    visited.add(currentParentId);
+    const parent = await db.getAsync('SELECT parent_id FROM folders WHERE id = ?', [currentParentId]);
+    currentParentId = parent?.parent_id;
+  }
+
+  return false;
+}
 
 export default router; 

@@ -49,17 +49,6 @@ const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserC
             </button>
 
             <UserManagement onUserChange={onUserChange} />
-
-            {!isAuthenticated && (
-              <a
-                href="/api/auth/google"
-                className="flex items-center ml-2 bg-white border border-gray-300 rounded shadow py-2 px-4 hover:bg-gray-50 transition"
-                style={{ textDecoration: 'none' }}
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mr-2" />
-                <span className="font-medium text-gray-700">Continue with Google</span>
-              </a>
-            )}
           </div>
         </div>
       </div>

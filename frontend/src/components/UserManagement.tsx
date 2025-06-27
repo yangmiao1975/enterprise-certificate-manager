@@ -95,7 +95,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserChange }) => {
         ) : (
           <div className="w-6 h-6 bg-sky-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-slate-200 shadow-sm">
             {currentUser?.username ? currentUser.username.charAt(0).toUpperCase() : '?'}
-          </div>
+        </div>
         )}
         <span>{currentUser.username}</span>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +117,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserChange }) => {
               ) : (
                 <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center text-white font-bold border-2 border-slate-200 shadow">
                   {currentUser?.username ? currentUser.username.charAt(0).toUpperCase() : '?'}
-                </div>
+              </div>
               )}
               <div>
                 <p className="text-sm font-medium text-slate-900 dark:text-slate-100">

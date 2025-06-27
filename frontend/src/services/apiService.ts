@@ -14,7 +14,7 @@ const createApiClient = (): AxiosInstance => {
   
   const client = axios.create({
     baseURL: `${baseURL}/api`,
-    timeout: 30000
+    timeout: 120000  // Increased to 2 minutes for certificate uploads
   });
 
   // Add auth token to requests
@@ -55,12 +55,14 @@ export interface ApiService {
   deleteCertificate(id: string): Promise<{ message: string }>;
   renewCertificate(id: string): Promise<{ message: string }>;
   downloadCertificate(id: string): Promise<string>;
+  assignCertificateToFolder(certificateId: string, folderId: string | null): Promise<Certificate>;
   
   // Folders
   getFolders(params?: { type?: string }): Promise<Folder[]>;
   createFolder(data: any): Promise<Folder>;
   updateFolder(id: string, data: any): Promise<Folder>;
   deleteFolder(id: string): Promise<{ message: string }>;
+  moveFolder(folderId: string, parentId: string | null): Promise<Folder>;
   
   // Users
   getUsers(): Promise<User[]>;
@@ -127,6 +129,11 @@ class RealApiService implements ApiService {
     return response.data;
   }
 
+  async assignCertificateToFolder(certificateId: string, folderId: string | null) {
+    const response = await this.client.patch(`/certificates/${certificateId}/folder`, { folderId });
+    return response.data;
+  }
+
   async getFolders(params?: { type?: string }) {
     const response = await this.client.get('/folders', { params });
     return response.data;
@@ -144,6 +151,11 @@ class RealApiService implements ApiService {
 
   async deleteFolder(id: string) {
     const response = await this.client.delete(`/folders/${id}`);
+    return response.data;
+  }
+
+  async moveFolder(folderId: string, parentId: string | null) {
+    const response = await this.client.patch(`/folders/${folderId}/move`, { parentId });
     return response.data;
   }
 

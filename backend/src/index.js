@@ -44,6 +44,10 @@ app.use(morgan('combined'));
 // Static files
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
+// Body parsing middleware (must come before routes that need req.body)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   console.log('HIT /health route');
@@ -54,15 +58,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// File upload route (Multer needs to run before body parsers)
-app.use('/api/certificates', authMiddleware, certificateRoutes);
-
-// Body parsing middleware (for JSON and urlencoded)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// API routes
+// API routes (body parsers must come before these)
 app.use('/api/auth', authRoutes);
+app.use('/api/certificates', authMiddleware, certificateRoutes);
 app.use('/api/folders', authMiddleware, folderRoutes);
 app.use('/api/metadata', authMiddleware, metadataRoutes);
 app.use('/api/users', authMiddleware, userRoutes);

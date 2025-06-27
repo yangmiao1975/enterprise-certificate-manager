@@ -62,13 +62,13 @@ export const logout = (): void => {
 export const getCurrentUser = async (): Promise<User | null> => {
   const token = localStorage.getItem('authToken');
   if (!token) return null;
-  try {
+      try {
     const user = await apiService.getCurrentUser();
     localStorage.setItem('currentUser', JSON.stringify(user));
     return user;
   } catch (e) {
     localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
+        localStorage.removeItem('currentUser');
     return null;
   }
 };

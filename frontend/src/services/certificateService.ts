@@ -102,59 +102,41 @@ export const assignCertificateToFolder = async (certificateId: string, folderId:
     throw new Error('User not authenticated');
   }
 
-  if (!canManageFolders()) {
-    throw new Error('Permission denied: Cannot assign certificates to folders');
-  }
-
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  const certificates = await getCertificates();
-  const certIndex = certificates.findIndex((c: Certificate) => c.id === certificateId);
-  if (certIndex > -1) {
-    // Check if user has access to the target folder
-    if (folderId && !canUploadToFolder(folderId)) {
-      throw new Error('Permission denied: Cannot assign to this folder');
-    }
-    
-    return certificates[certIndex];
-  }
-  return null;
+  // Call the real API service instead of mock logic
+  return await apiService.assignCertificateToFolder(certificateId, folderId);
 };
 
-export const createFolder = async (name: string): Promise<Folder> => {
+export const createFolder = async (name: string, parentId?: string): Promise<Folder> => {
   const currentUser = getCurrentUser();
   if (!currentUser) {
     throw new Error('User not authenticated');
   }
 
-  if (!canManageFolders()) {
-    throw new Error('Permission denied: Cannot create folders');
-  }
+  console.log('[Frontend] createFolder called with:', { name, parentId });
 
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  const allFolders = getAllFolders();
-  if (allFolders.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-    throw new Error(`Folder with name "${name}" already exists.`);
-  }
-
-  const newFolder: Folder = {
-    id: `folder-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+  // Call the real API service instead of mock logic
+  const folderData = {
     name: name.trim(),
-    description: `Custom folder created by ${currentUser.username}`,
-    type: 'custom',
-    permissions: ['read', 'write'],
-    createdAt: new Date().toISOString(),
-    createdBy: currentUser.id,
-    accessControl: {
-      roles: [currentUser.role],
-      users: [currentUser.id]
-    }
+    description: `Custom folder created by ${currentUser.username || currentUser.email || 'user'}`,
+    permissions: ['read', 'write']
   };
+  
+  // Only add accessControl if we have valid user data
+  if (currentUser.id && currentUser.role) {
+    folderData.accessControl = {
+      roles: [currentUser.role],
+      users: [String(currentUser.id)]  // Ensure it's a string
+    };
+  }
 
-  // In a real implementation, this would be saved to the metadata system
-  // For now, we'll just return the folder
-  return newFolder;
+  // Add parentId if provided (for creating subfolders)
+  if (parentId) {
+    folderData.parentId = parentId;
+    console.log('[Frontend] Adding parentId to folderData:', parentId);
+  }
+
+  console.log('[Frontend] Final folderData being sent:', folderData);
+  return await apiService.createFolder(folderData);
 };
 
 export const getFolders = async (): Promise<Folder[]> => {
@@ -163,8 +145,8 @@ export const getFolders = async (): Promise<Folder[]> => {
     throw new Error('User not authenticated');
   }
 
-  const accessibleFolders = getAccessibleFolders(currentUser);
-  return accessibleFolders;
+  // Call the real API service instead of mock data
+  return await apiService.getFolders();
 };
 
 export const updateFolder = async (folderId: string, name: string): Promise<Folder> => {
@@ -173,23 +155,21 @@ export const updateFolder = async (folderId: string, name: string): Promise<Fold
     throw new Error('User not authenticated');
   }
 
-  if (!canManageFolders()) {
-    throw new Error('Permission denied: Cannot update folders');
+  // Call the real API service instead of mock logic
+  const folderData = {
+    name: name.trim(),
+    permissions: ['read', 'write']
+  };
+  
+  // Only add accessControl if we have valid user data
+  if (currentUser.id && currentUser.role) {
+    folderData.accessControl = {
+      roles: [currentUser.role],
+      users: [String(currentUser.id)]  // Ensure it's a string
+    };
   }
 
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  const allFolders = getAllFolders();
-  const folderIndex = allFolders.findIndex(f => f.id === folderId);
-  if (folderIndex > -1) {
-    const updatedFolder: Folder = {
-      ...allFolders[folderIndex],
-      name: name.trim(),
-    };
-    allFolders[folderIndex] = updatedFolder;
-    return updatedFolder;
-  }
-  throw new Error(`Folder with id "${folderId}" not found.`);
+  return await apiService.updateFolder(folderId, folderData);
 };
 
 export const deleteFolder = async (folderId: string): Promise<boolean> => {
@@ -198,16 +178,7 @@ export const deleteFolder = async (folderId: string): Promise<boolean> => {
     throw new Error('User not authenticated');
   }
 
-  if (!canDeleteFolders()) {
-    throw new Error('Permission denied: Cannot delete folders');
-  }
-
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  const allFolders = getAllFolders();
-  const folderIndex = allFolders.findIndex(f => f.id === folderId);
-  if (folderIndex > -1) {
-    allFolders.splice(folderIndex, 1);
-    return true;
-  }
-  return false;
+  // Call the real API service instead of mock logic
+  await apiService.deleteFolder(folderId);
+  return true;
 }; 

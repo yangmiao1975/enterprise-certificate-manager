@@ -16,6 +16,7 @@ interface FolderPanelProps {
   selectedFolderId: string | null;
   onSelectFolder: (folderId: string | null) => void;
   onCreateFolder: () => void;
+  onCreateSubfolder?: (parentId: string) => void;
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   isLoading: boolean;
@@ -42,12 +43,15 @@ const FolderTree: React.FC<{
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onMoveFolder: (folderId: string, newParentId: string | null) => void;
+  onCreateSubfolder?: (parentId: string) => void;
   parentDroppableId: string;
-}> = ({ nodes, selectedFolderId, onSelectFolder, onEditFolder, onDeleteFolder, onMoveFolder, parentDroppableId }) => {
+}> = ({ nodes, selectedFolderId, onSelectFolder, onEditFolder, onDeleteFolder, onMoveFolder, onCreateSubfolder, parentDroppableId }) => {
   return (
     <Droppable droppableId={parentDroppableId} type="FOLDER">
-      {(provided) => (
-        <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
+      {(provided, snapshot) => (
+        <ul ref={provided.innerRef} {...provided.droppableProps} className={`space-y-1 ${
+          snapshot.isDraggingOver ? 'bg-blue-50 dark:bg-blue-900/20 rounded-md' : ''
+        }`}>
           {nodes.map((folder, idx) => (
             <Draggable key={folder.id} draggableId={folder.id} index={idx}>
               {(dragProvided) => (
@@ -63,6 +67,15 @@ const FolderTree: React.FC<{
                       <span className="truncate" title={folder.name}>{folder.name}</span>
                     </div>
                     <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {onCreateSubfolder && (
+                        <ActionButton
+                          onClick={() => onCreateSubfolder(folder.id)}
+                          title="Create subfolder"
+                          className="text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 p-1"
+                        >
+                          {ICONS.folderPlus}
+                        </ActionButton>
+                      )}
                       <ActionButton
                         onClick={() => onEditFolder(folder)}
                         title="Edit folder name"
@@ -89,6 +102,7 @@ const FolderTree: React.FC<{
                         onEditFolder={onEditFolder}
                         onDeleteFolder={onDeleteFolder}
                         onMoveFolder={onMoveFolder}
+                        onCreateSubfolder={onCreateSubfolder}
                         parentDroppableId={folder.id}
                       />
                     </div>
@@ -109,6 +123,7 @@ const FolderPanel: React.FC<FolderPanelProps> = ({
   selectedFolderId,
   onSelectFolder,
   onCreateFolder,
+  onCreateSubfolder,
   onEditFolder,
   onDeleteFolder,
   isLoading,
@@ -165,6 +180,7 @@ const FolderPanel: React.FC<FolderPanelProps> = ({
                 onEditFolder={onEditFolder}
                 onDeleteFolder={onDeleteFolder}
                 onMoveFolder={onMoveFolder}
+                onCreateSubfolder={onCreateSubfolder}
                 parentDroppableId="root"
               />
               {provided.placeholder}

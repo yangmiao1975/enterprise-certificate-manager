@@ -106,14 +106,30 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
 
     // Parse certificate (pass buffer and originalname)
     const certificateData = await parseCertificate(file.buffer, file.originalname);
-    const pemContent = file.buffer.toString('utf8');
-
-    // Create certificate in GCP
-    const gcpResult = await gcpCertificateService.createCertificate(certificateData, pemContent);
+    
+    // Pass raw buffer to GCP service (don't convert to UTF-8 for binary files)
+    console.log('[Route] Calling GCP service...');
+    const gcpResult = await gcpCertificateService.createCertificate(certificateData, file.buffer);
+    console.log('[Route] GCP service returned:', gcpResult);
 
     // Save to database
+    console.log('[Route] Saving to database...');
     const certificateId = uuidv4();
     const now = new Date().toISOString();
+    
+    // Get the normalized PEM content from GCP result or convert buffer to string for storage
+    let pemContentForDb;
+    if (gcpResult.normalizedPem) {
+      pemContentForDb = gcpResult.normalizedPem;
+    } else {
+      // Fallback: try to convert to string, but handle binary gracefully
+      try {
+        pemContentForDb = file.buffer.toString('utf8');
+      } catch (err) {
+        pemContentForDb = file.buffer.toString('base64'); // Store as base64 if UTF-8 fails
+      }
+    }
+    
     try {
     await db.runAsync(`
       INSERT INTO certificates (
@@ -131,27 +147,27 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
       certificateData.algorithm,
       certificateData.serialNumber,
       certificateData.status,
-      pemContent,
+      pemContentForDb,
       folderId || null,
       userId,
       now,
       gcpResult.gcpCertificateName
     ]);
+    console.log('[Route] Database insert successful');
     } catch (insertError) {
+      console.error('[Route] Database insert error:', insertError);
+      throw insertError;
     }
 
-    const certificate = await new Promise((resolve, reject) => {
-      db.getAsync(`
+    console.log('[Route] Querying database for inserted certificate...');
+    const certificate = await db.getAsync(`
       SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
       FROM certificates c
       LEFT JOIN folders f ON c.folder_id = f.id
       LEFT JOIN users u ON c.uploaded_by = u.id
       WHERE c.id = ?
-      `, [certificateId], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
+    `, [certificateId]);
+    console.log('[Route] Database query successful, sending response...');
     res.status(201).json(certificate);
   } catch (error) {
     res.status(400).json({ error: error.message || 'Unknown error during certificate upload' });

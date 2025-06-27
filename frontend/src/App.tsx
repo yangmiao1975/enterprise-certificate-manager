@@ -29,6 +29,7 @@ import {
   deleteFolder as apiDeleteFolder,
   assignCertificateToFolder as apiAssignCertificateToFolder
 } from './services/certificateService';
+import { apiService } from './services/apiService';
 import { loadNotificationSettings, saveNotificationSettings } from './services/notificationSettingsService';
 import { initializeAuth, getCurrentUser } from './services/authService';
 import { loadMetadata, getDefaultFolder } from './services/metadataService';
@@ -60,6 +61,7 @@ const MainApp: React.FC = () => {
   const notifiedForExpiryRef = React.useRef(notifiedForExpiry);
   const [isCreateEditFolderModalOpen, setIsCreateEditFolderModalOpen] = useState<boolean>(false);
   const [folderToEdit, setFolderToEdit] = useState<Folder | null>(null);
+  const [parentFolderForCreation, setParentFolderForCreation] = useState<string | null>(null);
   const [isFolderActionLoading, setIsFolderActionLoading] = useState<boolean>(false);
   const [isAssignFolderModalOpen, setIsAssignFolderModalOpen] = useState<boolean>(false);
   const [certToAssignFolder, setCertToAssignFolder] = useState<Certificate | null>(null);
@@ -333,11 +335,19 @@ Enterprise Certificate Manager (Simulated Email System)`;
   // Folder Handlers
   const handleCreateFolder = () => {
     setFolderToEdit(null);
+    setParentFolderForCreation(null);
+    setIsCreateEditFolderModalOpen(true);
+  };
+
+  const handleCreateSubfolder = (parentId: string) => {
+    setFolderToEdit(null);
+    setParentFolderForCreation(parentId);
     setIsCreateEditFolderModalOpen(true);
   };
 
   const handleEditFolder = (folder: Folder) => {
     setFolderToEdit(folder);
+    setParentFolderForCreation(null);
     setIsCreateEditFolderModalOpen(true);
   };
 
@@ -351,12 +361,13 @@ Enterprise Certificate Manager (Simulated Email System)`;
           addNotification(`Folder "${updatedFolder.name}" updated.`, 'success');
         }
       } else {
-        const newFolder = await apiCreateFolder(name);
+        const newFolder = await apiCreateFolder(name, parentFolderForCreation);
         setFolders(prevFolders => [...prevFolders, newFolder].sort((a,b) => a.name.localeCompare(b.name)));
         addNotification(`Folder "${newFolder.name}" created.`, 'success');
       }
       setIsCreateEditFolderModalOpen(false);
       setFolderToEdit(null);
+      setParentFolderForCreation(null);
     } catch (err: any) {
       addNotification(err.message || 'Failed to save folder.', 'error');
       throw err; // Re-throw to keep modal open with error
@@ -433,15 +444,27 @@ Enterprise Certificate Manager (Simulated Email System)`;
     return false;
   }
 
-  const handleMoveFolder = (folderId: string, newParentId: string | null) => {
+  const handleMoveFolder = async (folderId: string, newParentId: string | null) => {
     // Prevent moving a folder into itself or its descendants
     if (folderId === newParentId) return;
     if (newParentId && isDescendant(folders, newParentId, folderId)) return;
-    setFolders(prevFolders =>
-      prevFolders.map(folder =>
-        folder.id === folderId ? { ...folder, parentId: newParentId } : folder
-      )
-    );
+    
+    try {
+      // Call backend API to persist the move
+      await apiService.moveFolder(folderId, newParentId);
+      
+      // Update frontend state
+      setFolders(prevFolders =>
+        prevFolders.map(folder =>
+          folder.id === folderId ? { ...folder, parentId: newParentId } : folder
+        )
+      );
+      
+      addNotification('Folder moved successfully', 'success');
+    } catch (error: any) {
+      console.error('Failed to move folder:', error);
+      addNotification(error.message || 'Failed to move folder', 'error');
+    }
   };
 
   return (
@@ -461,6 +484,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
               selectedFolderId={selectedFolderId}
               onSelectFolder={setSelectedFolderId}
               onCreateFolder={handleCreateFolder}
+              onCreateSubfolder={handleCreateSubfolder}
               onEditFolder={handleEditFolder}
               onDeleteFolder={handleRequestDeleteFolder}
               isLoading={isLoadingFolders}
