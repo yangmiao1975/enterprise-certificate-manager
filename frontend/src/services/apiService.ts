@@ -46,6 +46,7 @@ const createApiClient = (): AxiosInstance => {
 export interface ApiService {
   // Authentication
   login(username: string, password: string): Promise<{ token: string; user: any }>;
+  register(userData: { username: string; email: string; password: string; role?: string }): Promise<any>;
   getCurrentUser(): Promise<any>;
   
   // Certificates
@@ -92,6 +93,11 @@ class RealApiService implements ApiService {
 
   async login(username: string, password: string) {
     const response = await this.client.post('/auth/login', { username, password });
+    return response.data;
+  }
+
+  async register(userData: { username: string; email: string; password: string; role?: string }) {
+    const response = await this.client.post('/auth/register', userData);
     return response.data;
   }
 

@@ -14,6 +14,7 @@ import AssignCertificateFolderModal from './components/modals/AssignCertificateF
 import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal';
 import { GeminiChat } from './components/GeminiChat';
 import Login from './components/Login';
+import Signup from './components/Signup';
 import OAuthSuccess from './components/OAuthSuccess';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -627,6 +628,7 @@ const App: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/login" element={<Login onLogin={() => {}} />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route
           path="/*"
