@@ -14,8 +14,16 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Build for different environments
+# Accept build arguments for environment variables
+ARG VITE_API_URL
+ARG VITE_ENVIRONMENT=gcp-cloud-run
 ARG BUILD_MODE=docker
+
+# Set environment variables for Vite build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_ENVIRONMENT=$VITE_ENVIRONMENT
+
+# Build for different environments
 RUN npm run build:${BUILD_MODE}
 
 # Production image, copy all the files and run the app

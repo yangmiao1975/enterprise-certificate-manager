@@ -20,9 +20,21 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$SHORT_SHA']
 
-  # Build and push frontend image
+  # Build and push frontend image with build args
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA', '-f', 'frontend/Dockerfile', 'frontend/']
+    args: 
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '--build-arg'
+      - 'VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app'
+      - '--build-arg'
+      - 'VITE_ENVIRONMENT=gcp-cloud-run'
+      - '--build-arg'
+      - 'BUILD_MODE=docker'
+      - 'frontend/'
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA']
 
@@ -57,7 +69,6 @@ steps:
         '--port', '80',
         '--memory', '256Mi',
         '--cpu', '0.5',
-        '--set-secrets', 'VITE_API_URL=certificate-manager-frontend-api-url:latest,VITE_ENVIRONMENT=certificate-manager-frontend-env:latest',
         '--service-account', '1044697249626-compute@developer.gserviceaccount.com'
       ]
 
