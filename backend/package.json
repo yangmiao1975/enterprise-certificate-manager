@@ -14,7 +14,8 @@
   "dependencies": {
     "@google-cloud/certificate-manager": "^2.0.0",
     "@google-cloud/storage": "^7.13.0",
-    "@peculiar/x509": "^1.13.0",
+    "@google/genai": "^1.7.0",
+    "@peculiar/x509": "^1.12.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.5.1",

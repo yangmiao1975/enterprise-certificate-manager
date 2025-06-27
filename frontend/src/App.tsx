@@ -12,6 +12,7 @@ import FolderPanel from './components/FolderPanel';
 import CreateEditFolderModal from './components/modals/CreateEditFolderModal';
 import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal';
 import ConfirmFolderDeleteModal from './components/modals/ConfirmFolderDeleteModal';
+import { GeminiChat } from './components/GeminiChat';
 import Login from './components/Login';
 import OAuthSuccess from './components/OAuthSuccess';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -69,6 +70,8 @@ const MainApp: React.FC = () => {
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isGeminiChatOpen, setIsGeminiChatOpen] = useState<boolean>(false);
+  const [selectedCertificateForChat, setSelectedCertificateForChat] = useState<string | undefined>(undefined);
 
   const addNotification = useCallback((message: string, type: NotificationMessage['type']) => {
     const newNotification: NotificationMessage = {
@@ -473,6 +476,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
         onUploadClick={() => setIsUploadModalOpen(true)} 
         onSettingsClick={() => setIsNotificationSettingsModalOpen(true)} 
         onUserChange={handleUserChange}
+        onGeminiChatClick={() => setIsGeminiChatOpen(true)}
       />
       <NotificationArea notifications={notifications} onDismissNotification={dismissNotification} />
       
@@ -604,6 +608,16 @@ Enterprise Certificate Manager (Simulated Email System)`;
       <footer className="text-center py-6 text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 mt-12">
         © {new Date().getFullYear()} Enterprise Certificate Manager. All rights reserved. (Simulated Application)
       </footer>
+
+      {/* Gemini Chat Modal */}
+      <GeminiChat
+        isOpen={isGeminiChatOpen}
+        onClose={() => {
+          setIsGeminiChatOpen(false);
+          setSelectedCertificateForChat(undefined);
+        }}
+        selectedCertificateId={selectedCertificateForChat}
+      />
     </div>
   );
 };

@@ -71,6 +71,15 @@ export interface ApiService {
   // Metadata
   getMetadata(): Promise<any>;
   getStats(): Promise<any>;
+  
+  // Gemini AI
+  sendChatMessage(messages: any[], message: string): Promise<any>;
+  getChatHistory(): Promise<any>;
+  clearChatHistory(): Promise<any>;
+  analyzeCertificate(certificateId: string): Promise<any>;
+  getDatabaseInsights(): Promise<any>;
+  parseCertificate(pemContent: string, fileName?: string): Promise<any>;
+  getCertificateRecommendations(): Promise<any>;
 }
 
 // Real API service implementation
@@ -176,6 +185,41 @@ class RealApiService implements ApiService {
 
   async getStats() {
     const response = await this.client.get('/metadata/stats');
+    return response.data;
+  }
+
+  async sendChatMessage(messages: any[], message: string) {
+    const response = await this.client.post('/gemini/chat', { messages, message });
+    return response.data;
+  }
+
+  async getChatHistory() {
+    const response = await this.client.get('/gemini/chat-history');
+    return response.data;
+  }
+
+  async clearChatHistory() {
+    const response = await this.client.delete('/gemini/chat-history');
+    return response.data;
+  }
+
+  async analyzeCertificate(certificateId: string) {
+    const response = await this.client.post(`/gemini/analyze-certificate/${certificateId}`);
+    return response.data;
+  }
+
+  async getDatabaseInsights() {
+    const response = await this.client.get('/gemini/database-insights');
+    return response.data;
+  }
+
+  async parseCertificate(pemContent: string, fileName?: string) {
+    const response = await this.client.post('/gemini/parse-certificate', { pemContent, fileName });
+    return response.data;
+  }
+
+  async getCertificateRecommendations() {
+    const response = await this.client.get('/gemini/certificate-recommendations');
     return response.data;
   }
 }

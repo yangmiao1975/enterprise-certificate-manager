@@ -14,6 +14,7 @@ import certificateRoutes from './routes/certificates.js';
 import folderRoutes from './routes/folders.js';
 import metadataRoutes from './routes/metadata.js';
 import userRoutes from './routes/users.js';
+import geminiRoutes from './routes/gemini.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -64,6 +65,7 @@ app.use('/api/certificates', authMiddleware, certificateRoutes);
 app.use('/api/folders', authMiddleware, folderRoutes);
 app.use('/api/metadata', authMiddleware, metadataRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
+app.use('/api/gemini', geminiRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

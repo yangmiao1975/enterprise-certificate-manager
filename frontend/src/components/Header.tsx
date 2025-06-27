@@ -7,11 +7,12 @@ interface HeaderProps {
   onUploadClick: () => void;
   onSettingsClick: () => void;
   onUserChange?: () => void;
+  onGeminiChatClick?: () => void;
 }
 
 const isAuthenticated = !!localStorage.getItem('token');
 
-const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserChange }) => {
+const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserChange, onGeminiChatClick }) => {
   return (
     <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
       <div className="container mx-auto px-4 md:px-6 lg:px-8">
@@ -36,6 +37,16 @@ const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserC
             >
               Upload Certificate
             </button>
+            
+            {onGeminiChatClick && (
+              <button
+                onClick={onGeminiChatClick}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+                title="AI Assistant"
+              >
+                AI Chat
+              </button>
+            )}
             
             <button
               onClick={onSettingsClick}
