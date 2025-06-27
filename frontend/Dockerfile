@@ -1,4 +1,4 @@
-# Production image for Cloud Run deployment
+# Build stage
 FROM node:18-alpine AS builder
 WORKDIR /app
 
@@ -21,7 +21,8 @@ ENV VITE_ENVIRONMENT=$VITE_ENVIRONMENT
 # Build for production
 RUN npm run build:${BUILD_MODE}
 
-# Production image with nginx
+# Production stage with nginx
+FROM nginx:alpine AS production
 WORKDIR /usr/share/nginx/html
 
 # Install wget for health checks
