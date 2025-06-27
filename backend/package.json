@@ -12,7 +12,7 @@
     "build:docker": "npm run build"
   },
   "dependencies": {
-    "@google-cloud/certificate-manager": "^3.0.0",
+    "@google-cloud/certificate-manager": "^2.0.0",
     "@google-cloud/storage": "^7.13.0",
     "@peculiar/x509": "^1.13.0",
     "bcryptjs": "^2.4.3",
