@@ -53,7 +53,7 @@ steps:
         '--port', '8080',
         '--memory', '512Mi',
         '--cpu', '1',
-        '--set-env-vars', 'NODE_ENV=production',
+        '--set-env-vars', 'NODE_ENV=production,CORS_ORIGIN=https://certificate-manager-frontend-1044697249626.us-central1.run.app',
         '--set-secrets', 'JWT_SECRET=certificate-manager-jwt-secret:latest,DATABASE_URL=certificate-manager-database-url:latest,GEMINI_API_KEY=certificate-manager-gemini-api-key:latest',
         '--service-account', '1044697249626-compute@developer.gserviceaccount.com'
       ]
