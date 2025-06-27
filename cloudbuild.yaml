@@ -56,7 +56,7 @@ steps:
         '--service-account', '1044697249626-compute@developer.gserviceaccount.com'
       ]
 
-  # Deploy frontend to Cloud Run with secrets
+  # Deploy frontend to Cloud Run with health check timeout
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -69,6 +69,7 @@ steps:
         '--port', '80',
         '--memory', '256Mi',
         '--cpu', '0.5',
+        '--timeout', '300',
         '--service-account', '1044697249626-compute@developer.gserviceaccount.com'
       ]
 
