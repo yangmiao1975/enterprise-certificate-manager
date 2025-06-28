@@ -15,13 +15,14 @@ import folderRoutes from './routes/folders.js';
 import metadataRoutes from './routes/metadata.js';
 import userRoutes from './routes/users.js';
 import geminiRoutes from './routes/gemini.js';
+import healthRoutes from './routes/health.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { authMiddleware } from './middleware/auth.js';
 
-// Import database initialization
-import { initializeDatabase } from './database/init.js';
+// Import flexible database initialization
+import { initializeDatabase } from './database/flexible-init.js';
 
 // Load environment variables
 dotenv.config();
@@ -49,7 +50,8 @@ app.use('/uploads', express.static(join(__dirname, '../uploads')));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoints
+app.use('/api/health', healthRoutes);
 app.get('/health', (req, res) => {
   console.log('HIT /health route');
   res.json({ 
