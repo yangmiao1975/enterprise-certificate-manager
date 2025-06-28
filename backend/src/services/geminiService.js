@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 import { promisify } from 'util';
 
 const API_KEY = process.env.GEMINI_API_KEY || "";
