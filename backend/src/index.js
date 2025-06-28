@@ -15,6 +15,8 @@ import folderRoutes from './routes/folders.js';
 import metadataRoutes from './routes/metadata.js';
 import userRoutes from './routes/users.js';
 import geminiRoutes from './routes/gemini.js';
+import aiRoutes from './routes/ai.js';
+import gcpDiagnosticsRoutes from './routes/gcp-diagnostics.js';
 import healthRoutes from './routes/health.js';
 
 // Import middleware
@@ -68,6 +70,8 @@ app.use('/api/folders', authMiddleware, folderRoutes);
 app.use('/api/metadata', authMiddleware, metadataRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/gemini', geminiRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/gcp-diagnostics', gcpDiagnosticsRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

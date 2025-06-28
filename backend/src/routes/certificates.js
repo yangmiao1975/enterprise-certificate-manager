@@ -105,12 +105,14 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
     }
 
     // Parse certificate (pass buffer and originalname)
+    console.log('[Route] Parsing certificate file:', file.originalname, 'Size:', file.buffer.length, 'bytes');
     const certificateData = await parseCertificate(file.buffer, file.originalname);
+    console.log('[Route] Certificate parsed successfully. CN:', certificateData.commonName);
     
     // Pass raw buffer to GCP service (don't convert to UTF-8 for binary files)
-    console.log('[Route] Calling GCP service...');
+    console.log('[Route] Calling GCP service for certificate upload...');
     const gcpResult = await gcpCertificateService.createCertificate(certificateData, file.buffer);
-    console.log('[Route] GCP service returned:', gcpResult);
+    console.log('[Route] GCP service upload successful. ID:', gcpResult.id);
 
     // Save to database
     console.log('[Route] Saving to database...');
@@ -172,7 +174,35 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
     console.log('[Route] Database query successful, sending response...');
     res.status(201).json(certificate);
   } catch (error) {
-    res.status(400).json({ error: error.message || 'Unknown error during certificate upload' });
+    console.error('[Route] Certificate upload error:', error);
+    
+    // Provide specific error messages based on error type
+    let errorMessage = 'Certificate upload failed';
+    let statusCode = 400;
+    
+    if (error.message.includes('Cloud Storage')) {
+      errorMessage = `GCP Cloud Storage error: ${error.message}`;
+      statusCode = 503; // Service unavailable
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Upload timed out. Please try again with a smaller file or check your connection.';
+      statusCode = 408; // Request timeout
+    } else if (error.message.includes('permission') || error.message.includes('auth')) {
+      errorMessage = 'Authentication error. Please check GCP credentials.';
+      statusCode = 401; // Unauthorized
+    } else if (error.message.includes('certificate') && error.message.includes('invalid')) {
+      errorMessage = `Invalid certificate: ${error.message}`;
+      statusCode = 400; // Bad request
+    } else if (error.message.includes('database') || error.message.includes('Database')) {
+      errorMessage = 'Database error. Please try again.';
+      statusCode = 500; // Internal server error
+    } else {
+      errorMessage = error.message || 'Unknown error during certificate upload';
+    }
+    
+    res.status(statusCode).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

@@ -27,6 +27,14 @@ export async function initializeDatabase() {
     // Initialize password service
     passwordService = new PasswordService();
     
+    // Run AI provider migration
+    try {
+      const { runAIProviderMigration } = await import('./runMigration.js');
+      await runAIProviderMigration();
+    } catch (migrationError) {
+      console.warn('⚠️ AI provider migration skipped:', migrationError.message);
+    }
+    
     console.log(`✅ Database system initialized: ${databaseService.provider.toUpperCase()}`);
     
     return connection;

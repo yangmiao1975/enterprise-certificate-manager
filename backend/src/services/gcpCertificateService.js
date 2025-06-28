@@ -195,22 +195,28 @@ Content preview: ${asUtf8.substring(0, 100)}...`);
       
       // Check if this is just a leaf certificate (single cert without chain)
       if (pemCerts.length === 1) {
-        console.log('[GCP Upload] Warning: Only one certificate found. This may cause "empty chain" error in GCP.');
-        console.log('[GCP Upload] Attempting to build certificate chain automatically...');
+        console.log('[GCP Upload] Single certificate detected (', normalizedPem.length, 'bytes)');
+        console.log('[GCP Upload] For Cloud Storage monitoring, single certificates are acceptable.');
         
-        try {
-          // Try to build the chain automatically
-          const chainPem = await this.buildCertificateChain(pemCerts[0]);
-          if (chainPem && chainPem !== normalizedPem) {
-            normalizedPem = chainPem;
-            const newPemCerts = normalizedPem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g);
-            console.log('[GCP Upload] Successfully built certificate chain with', newPemCerts.length, 'certificates');
-          } else {
-            console.log('[GCP Upload] Could not build complete chain. Proceeding with single certificate.');
+        // Only attempt chain building if explicitly requested or if we know it's needed
+        const shouldBuildChain = process.env.GCP_AUTO_BUILD_CHAIN === 'true';
+        
+        if (shouldBuildChain) {
+          console.log('[GCP Upload] Attempting to build certificate chain automatically...');
+          try {
+            const chainPem = await this.buildCertificateChain(pemCerts[0]);
+            if (chainPem && chainPem !== normalizedPem && chainPem.length > normalizedPem.length) {
+              normalizedPem = chainPem;
+              const newPemCerts = normalizedPem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g);
+              console.log('[GCP Upload] Successfully built certificate chain with', newPemCerts.length, 'certificates');
+            } else {
+              console.log('[GCP Upload] Chain building did not improve certificate. Using original.');
+            }
+          } catch (chainError) {
+            console.log('[GCP Upload] Chain building failed (this is OK):', chainError.message);
           }
-        } catch (chainError) {
-          console.log('[GCP Upload] Chain building failed:', chainError.message);
-          console.log('[GCP Upload] Proceeding with single certificate - this may fail in GCP.');
+        } else {
+          console.log('[GCP Upload] Auto chain building disabled. Using certificate as-is.');
         }
       }
       
@@ -249,35 +255,59 @@ Content preview: ${asUtf8.substring(0, 100)}...`);
       const fileName = `${certificateId}.pem`;
       
       try {
-        console.log('[GCP Upload] Using existing bucket:', bucketName);
+        // Ensure bucket exists first
+        console.log('[GCP Upload] Ensuring bucket exists...');
+        await this.ensureBucketExists(bucketName);
         
         console.log('[GCP Upload] Uploading certificate file...');
         const bucket = this.storage.bucket(bucketName);
         const file = bucket.file(fileName);
         
-        // Add timeout for file upload
+        // Add timeout for file upload (increased to 60 seconds)
         const uploadPromise = file.save(normalizedPem, {
           metadata: {
             contentType: 'application/x-pem-file',
             metadata: {
               certificateId: certificateId,
               uploadedAt: new Date().toISOString(),
-              storageType: 'cloud-storage-only'
+              storageType: 'cloud-storage-only',
+              originalFileName: fileName,
+              pemLength: normalizedPem.length.toString()
             }
-          }
+          },
+          resumable: false, // Use simple upload for small files
+          validation: false // Skip MD5 validation for speed
         });
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('File upload timeout after 45 seconds')), 45000)
+          setTimeout(() => reject(new Error('File upload timeout after 60 seconds')), 60000)
         );
         
         await Promise.race([uploadPromise, timeoutPromise]);
         
         console.log('[GCP Upload] Certificate saved to Cloud Storage successfully');
         console.log('[GCP Upload] File location: gs://' + bucketName + '/' + fileName);
+        
+        // Verify the upload by checking if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new Error('Upload verification failed - file not found in Cloud Storage');
+        }
+        console.log('[GCP Upload] Upload verification successful');
+        
       } catch (storageError) {
         console.error('[GCP Upload] Cloud Storage error:', storageError);
-        throw new Error(`Cloud Storage upload failed: ${storageError.message}`);
+        
+        // Add more specific error messages
+        if (storageError.message.includes('timeout')) {
+          throw new Error(`Cloud Storage upload timed out. This may be due to slow network or large file size. Please try again.`);
+        } else if (storageError.message.includes('permission') || storageError.message.includes('auth')) {
+          throw new Error(`Cloud Storage permission error. Please check GCP credentials and bucket permissions.`);
+        } else if (storageError.message.includes('quota')) {
+          throw new Error(`Cloud Storage quota exceeded. Please check your GCP storage limits.`);
+        } else {
+          throw new Error(`Cloud Storage upload failed: ${storageError.message}`);
+        }
       }
       
       const result = {
