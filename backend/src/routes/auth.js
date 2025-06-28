@@ -6,10 +6,7 @@ import { getDatabase } from '../database/init.js';
 // TODO: Update to use flexible database and password service
 // import { getDatabase, getPasswordService } from '../database/flexible-init.js';
 
-// Import PasswordService directly for now
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const PasswordService = require('../services/passwordService.js');
+import PasswordService from '../services/passwordService.js';
 import { validateLogin, validateRegister } from '../middleware/validation.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';

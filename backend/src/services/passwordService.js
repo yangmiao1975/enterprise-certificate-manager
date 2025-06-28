@@ -1,6 +1,6 @@
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-const SecretManagerService = require('./secretManagerService');
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import SecretManagerService from './secretManagerService.js';
 
 class PasswordService {
   constructor() {
@@ -224,4 +224,4 @@ class PasswordService {
   }
 }
 
-module.exports = PasswordService;
+export default PasswordService;

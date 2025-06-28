@@ -353,4 +353,4 @@ class SecretManagerService {
   }
 }
 
-module.exports = SecretManagerService;
+export default SecretManagerService;
