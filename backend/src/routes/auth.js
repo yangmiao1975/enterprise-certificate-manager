@@ -143,12 +143,17 @@ router.post('/register', validateRegister, async (req, res, next) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Create user with generated ID (compatible with current DB schema)
-    const userId = `user-${Date.now()}`;
-
     // Hash password securely (will use Secret Manager if enabled)
     const passwordService = new PasswordService();
     let passwordHash;
+    
+    // Insert user into database (let SQLite auto-generate the ID)
+    const result = await db.runAsync(
+      'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
+      [username, email, 'temp', role || 'viewer', 1]
+    );
+
+    const userId = result.lastID;
     
     if (passwordService.useSecretManager) {
       passwordHash = await passwordService.hashAndStorePassword(userId, password);
@@ -156,10 +161,10 @@ router.post('/register', validateRegister, async (req, res, next) => {
       passwordHash = await bcrypt.hash(password, 10);
     }
 
-    // Insert user into database
+    // Update the password hash
     await db.runAsync(
-      'INSERT INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, username, email, passwordHash, role || 'viewer', 1]
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [passwordHash, userId]
     );
 
     const newUser = await db.getAsync('SELECT id, username, email, role FROM users WHERE id = ?', [userId]);

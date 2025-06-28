@@ -5,10 +5,13 @@ import SecretManagerService from './secretManagerService.js';
 class PasswordService {
   constructor() {
     this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true';
+    this.secretManagerInitialized = false;
     
     if (this.useSecretManager) {
       try {
         this.secretManager = new SecretManagerService();
+        // Initialize async
+        this.initializeSecretManager();
       } catch (error) {
         console.log('Secret Manager not available, falling back to traditional hashing:', error.message);
         this.useSecretManager = false;
@@ -21,6 +24,16 @@ class PasswordService {
     }
   }
 
+  async initializeSecretManager() {
+    try {
+      await this.secretManager.initializeClient();
+      this.secretManagerInitialized = this.secretManager.isAvailable;
+    } catch (error) {
+      console.log('Failed to initialize Secret Manager:', error.message);
+      this.secretManagerInitialized = false;
+    }
+  }
+
   /**
    * Hash and store password securely
    * @param {string} userId - User ID
@@ -30,6 +43,17 @@ class PasswordService {
   async hashAndStorePassword(userId, password) {
     if (!this.useSecretManager) {
       // Traditional bcrypt hashing for local development
+      return await bcrypt.hash(password, 12);
+    }
+
+    // Wait for Secret Manager initialization if needed
+    if (!this.secretManagerInitialized && this.secretManager) {
+      await this.initializeSecretManager();
+    }
+
+    // Check if Secret Manager is actually available
+    if (!this.secretManagerInitialized || !this.secretManager?.isAvailable) {
+      console.log('Secret Manager not available, using traditional hashing');
       return await bcrypt.hash(password, 12);
     }
 

@@ -9,33 +9,34 @@ class SecretManagerService {
     this.provider = process.env.SECRET_MANAGER_PROVIDER || 'gcp';
     this.projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
     this.region = process.env.AWS_REGION || 'us-east-1';
+    this.isAvailable = false;
     
     console.log(`Initializing Secret Manager: ${this.provider.toUpperCase()}`);
     
-    // Initialize the appropriate client
+    // Initialize the appropriate client (async)
     this.initializeClient();
   }
 
-  initializeClient() {
+  async initializeClient() {
     switch (this.provider.toLowerCase()) {
       case 'gcp':
       case 'google':
-        this.initializeGCPClient();
+        await this.initializeGCPClient();
         break;
       case 'aws':
-        this.initializeAWSClient();
+        await this.initializeAWSClient();
         break;
       case 'azure':
-        this.initializeAzureClient();
+        await this.initializeAzureClient();
         break;
       default:
         throw new Error(`Unsupported secret manager provider: ${this.provider}`);
     }
   }
 
-  initializeGCPClient() {
+  async initializeGCPClient() {
     try {
-      const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+      const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
       this.client = new SecretManagerServiceClient();
       this.isAvailable = true;
       console.log('✓ GCP Secret Manager initialized');
@@ -45,9 +46,9 @@ class SecretManagerService {
     }
   }
 
-  initializeAWSClient() {
+  async initializeAWSClient() {
     try {
-      const AWS = require('aws-sdk');
+      const AWS = await import('aws-sdk');
       this.client = new AWS.SecretsManager({ region: this.region });
       this.isAvailable = true;
       console.log('✓ AWS Secrets Manager initialized');
@@ -57,10 +58,10 @@ class SecretManagerService {
     }
   }
 
-  initializeAzureClient() {
+  async initializeAzureClient() {
     try {
-      const { SecretClient } = require('@azure/keyvault-secrets');
-      const { DefaultAzureCredential } = require('@azure/identity');
+      const { SecretClient } = await import('@azure/keyvault-secrets');
+      const { DefaultAzureCredential } = await import('@azure/identity');
       
       const vaultName = process.env.AZURE_KEYVAULT_NAME;
       if (!vaultName) {
