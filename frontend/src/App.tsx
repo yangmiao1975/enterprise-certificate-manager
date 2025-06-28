@@ -25,6 +25,7 @@ import {
   renewCertificate as apiRenewCertificate, 
   addCertificate as apiAddCertificate, 
   deleteCertificate as apiDeleteCertificate,
+  downloadCertificateFile,
   getFolders,
   createFolder as apiCreateFolder,
   updateFolder as apiUpdateFolder,
@@ -274,10 +275,50 @@ Enterprise Certificate Manager (Simulated Email System)`;
     }
   };
 
-  const handleDownloadCertificate = (certificate: Certificate) => {
-    setSelectedCertificate(certificate);
-    setViewModalMode('download');
-    setIsViewModalOpen(true);
+  const handleDownloadCertificate = async (certificate: Certificate) => {
+    try {
+      // If certificate has PEM content, download directly from local data
+      if (certificate.pem) {
+        // Create blob with PEM content
+        const blob = new Blob([certificate.pem], { type: 'application/x-pem-file' });
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Generate filename based on certificate common name
+        const sanitizedName = certificate.commonName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        link.download = `${sanitizedName}.pem`;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        addNotification(`Certificate "${certificate.commonName}" downloaded successfully.`, 'success');
+      } else {
+        // Try to download from backend
+        try {
+          const sanitizedName = certificate.commonName.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const filename = await downloadCertificateFile(certificate.id, `${sanitizedName}.pem`);
+          addNotification(`Certificate "${certificate.commonName}" downloaded as "${filename}".`, 'success');
+        } catch (backendError) {
+          console.warn('Backend download failed, falling back to modal:', backendError);
+          // Final fallback: open modal for viewing/copying
+          setSelectedCertificate(certificate);
+          setViewModalMode('download');
+          setIsViewModalOpen(true);
+          addNotification('Certificate will be displayed for copying. Direct download not available.', 'info');
+        }
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      addNotification('Failed to download certificate.', 'error');
+    }
   };
   
   const handleViewDetails = (certificate: Certificate) => {

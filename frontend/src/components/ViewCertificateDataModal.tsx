@@ -32,6 +32,30 @@ const ViewCertificateDataModal: React.FC<ViewCertificateDataModalProps> = ({ cer
         .catch(err => console.error('Failed to copy PEM: ', err));
     }
   };
+
+  const handleDownloadPem = () => {
+    if (certificate.pem) {
+      // Create blob with PEM content
+      const blob = new Blob([certificate.pem], { type: 'application/x-pem-file' });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename based on certificate common name
+      const sanitizedName = certificate.commonName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      link.download = `${sanitizedName}.pem`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
+  };
   
   const title = mode === 'download' ? `Certificate PEM: ${certificate.commonName}` : `Certificate Details: ${certificate.commonName}`;
 
@@ -55,13 +79,22 @@ const ViewCertificateDataModal: React.FC<ViewCertificateDataModalProps> = ({ cer
                 <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-all">
                 {certificate.pem}
                 </pre>
-                <button
-                onClick={handleCopyPem}
-                title="Copy PEM to clipboard"
-                className="absolute top-2 right-2 p-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-600 dark:text-slate-300 transition"
-                >
-                {pemCopied ? <span className="text-xs">Copied!</span> : ICONS.copy}
-                </button>
+                <div className="absolute top-2 right-2 flex space-x-1">
+                    <button
+                    onClick={handleDownloadPem}
+                    title="Download PEM file"
+                    className="p-1.5 bg-emerald-100 dark:bg-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-700 rounded text-emerald-600 dark:text-emerald-300 transition"
+                    >
+                    {ICONS.download}
+                    </button>
+                    <button
+                    onClick={handleCopyPem}
+                    title="Copy PEM to clipboard"
+                    className="p-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-600 dark:text-slate-300 transition"
+                    >
+                    {pemCopied ? <span className="text-xs">Copied!</span> : ICONS.copy}
+                    </button>
+                </div>
             </div>
             </div>
         )}
