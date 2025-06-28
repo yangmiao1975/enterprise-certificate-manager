@@ -3,6 +3,8 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getDatabase } from '../database/init.js';
+// TODO: Update to use flexible database and password service
+// import { getDatabase, getPasswordService } from '../database/flexible-init.js';
 import { validateLogin, validateRegister } from '../middleware/validation.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
