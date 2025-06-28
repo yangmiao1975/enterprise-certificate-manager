@@ -15,28 +15,45 @@ steps:
         gcloud secrets versions access latest --secret="certificate-manager-database-url" > database_url.txt
         gcloud secrets versions access latest --secret="certificate-manager-gemini-api-key" > gemini_api_key.txt
 
-  # Build and push backend image
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA', '-f', 'backend/Dockerfile', 'backend/']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA']
-
-  # Build and push frontend image with build args
-  - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
+  # Install dependencies and build backend with Node.js 20
+  - name: 'node:20-alpine'
+    id: 'build-backend'
+    entrypoint: 'sh'
     args:
       - '-c'
       - |
-        GEMINI_API_KEY=$(cat gemini_api_key.txt)
-        docker build \
-          -t gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA \
-          -f frontend/Dockerfile \
-          --build-arg VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app \
-          --build-arg VITE_ENVIRONMENT=gcp-cloud-run \
-          --build-arg BUILD_MODE=docker \
-          --build-arg VITE_GEMINI_API_KEY="$$GEMINI_API_KEY" \
-          frontend/
+        cd backend
+        npm ci --only=production
+        npm run build
+    env:
+      - 'NODE_ENV=production'
+
+  # Install dependencies and build frontend with Node.js 20  
+  - name: 'node:20-alpine'
+    id: 'build-frontend'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd frontend
+        npm ci
+        VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app \
+        VITE_ENVIRONMENT=gcp-cloud-run \
+        VITE_GEMINI_API_KEY="$(cat ../gemini_api_key.txt)" \
+        npm run build
     waitFor: ['fetch-secrets']
+
+  # Build and push backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA', '-f', 'backend/Dockerfile', 'backend/']
+    waitFor: ['build-backend']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA']
+
+  # Build and push frontend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA', '-f', 'frontend/Dockerfile', 'frontend/']
+    waitFor: ['build-frontend']
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA']
 
