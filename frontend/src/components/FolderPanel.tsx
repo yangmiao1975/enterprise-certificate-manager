@@ -32,7 +32,8 @@ interface FolderTreeNode extends Folder {
 function buildFolderTree(folders: Folder[], parentId: string | null = null): FolderTreeNode[] {
   return folders
     .filter(f => (f.parentId ?? null) === parentId)
-    .map(f => ({ ...f, children: buildFolderTree(folders, f.id) }));
+    .map(f => ({ ...f, children: buildFolderTree(folders, f.id) }))
+    .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
 }
 
 // Update FolderTree props to use FolderTreeNode
@@ -49,13 +50,14 @@ const FolderTree: React.FC<{
   return (
     <Droppable droppableId={parentDroppableId} type="FOLDER">
       {(provided, snapshot) => (
-        <ul ref={provided.innerRef} {...provided.droppableProps} className={`space-y-1 ${
-          snapshot.isDraggingOver ? 'bg-blue-50 dark:bg-blue-900/20 rounded-md' : ''
+        <ul ref={provided.innerRef} {...provided.droppableProps} className={`space-y-1 transition-all duration-200 ${
+          snapshot.isDraggingOver ? 'bg-blue-50 dark:bg-blue-900/20 rounded-md border-2 border-dashed border-blue-300 dark:border-blue-600 p-2' : ''
         }`}>
           {nodes.map((folder, idx) => (
             <Draggable key={folder.id} draggableId={folder.id} index={idx}>
-              {(dragProvided) => (
-                <li ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}>
+              {(dragProvided, dragSnapshot) => (
+                <li ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
+                    className={`${dragSnapshot.isDragging ? 'transform rotate-2 scale-105 shadow-xl z-50' : ''} transition-all duration-200`}>
                   <div
                     className={`group w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer
                       ${selectedFolderId === folder.id 
@@ -134,9 +136,24 @@ const FolderPanel: React.FC<FolderPanelProps> = ({
 
   // Handle drag end
   const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
+    console.log('🔄 Drag end result:', result);
+    
+    if (!result.destination) {
+      console.log('❌ No destination, drag cancelled');
+      return;
+    }
+    
     const folderId = result.draggableId;
     const newParentId = result.destination.droppableId === 'root' ? null : result.destination.droppableId;
+    
+    console.log('📁 Moving folder:', {
+      folderId,
+      fromParent: result.source.droppableId,
+      toParent: newParentId || 'root',
+      fromIndex: result.source.index,
+      toIndex: result.destination.index
+    });
+    
     if (onMoveFolder) {
       onMoveFolder(folderId, newParentId);
     }

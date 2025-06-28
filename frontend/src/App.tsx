@@ -397,23 +397,36 @@ Enterprise Certificate Manager (Simulated Email System)`;
   };
 
   const handleSaveFolders = async (name: string, folderIdToUpdate?: string) => {
+    console.log('📁 handleSaveFolders called:', { name, folderIdToUpdate, parentFolderForCreation });
     setIsFolderActionLoading(true);
     try {
       if (folderIdToUpdate) {
+        console.log('🔄 Updating existing folder:', folderIdToUpdate);
         const updatedFolder = await apiUpdateFolder(folderIdToUpdate, name);
         if (updatedFolder) {
           setFolders(prevFolders => prevFolders.map(f => f.id === folderIdToUpdate ? updatedFolder : f).sort((a,b) => a.name.localeCompare(b.name)));
           addNotification(`Folder "${updatedFolder.name}" updated.`, 'success');
         }
       } else {
+        console.log('🆕 Creating new folder with parent:', parentFolderForCreation);
         const newFolder = await apiCreateFolder(name, parentFolderForCreation);
-        setFolders(prevFolders => [...prevFolders, newFolder].sort((a,b) => a.name.localeCompare(b.name)));
-        addNotification(`Folder "${newFolder.name}" created.`, 'success');
+        console.log('✅ New folder created:', newFolder);
+        
+        setFolders(prevFolders => {
+          const updated = [...prevFolders, newFolder].sort((a,b) => a.name.localeCompare(b.name));
+          console.log('🔄 Updated folders list:', updated);
+          return updated;
+        });
+        
+        const parentName = parentFolderForCreation ? 
+          folders.find(f => f.id === parentFolderForCreation)?.name || 'Unknown' : 'root';
+        addNotification(`Folder "${newFolder.name}" created under "${parentName}".`, 'success');
       }
       setIsCreateEditFolderModalOpen(false);
       setFolderToEdit(null);
       setParentFolderForCreation(null);
     } catch (err: any) {
+      console.error('❌ Failed to save folder:', err);
       addNotification(err.message || 'Failed to save folder.', 'error');
       throw err; // Re-throw to keep modal open with error
     } finally {
@@ -493,24 +506,40 @@ Enterprise Certificate Manager (Simulated Email System)`;
   }
 
   const handleMoveFolder = async (folderId: string, newParentId: string | null) => {
+    console.log('📁 handleMoveFolder called:', { folderId, newParentId });
+    
     // Prevent moving a folder into itself or its descendants
-    if (folderId === newParentId) return;
-    if (newParentId && isDescendant(folders, newParentId, folderId)) return;
+    if (folderId === newParentId) {
+      console.log('❌ Cannot move folder into itself');
+      addNotification('Cannot move folder into itself', 'error');
+      return;
+    }
+    if (newParentId && isDescendant(folders, newParentId, folderId)) {
+      console.log('❌ Cannot move folder into its descendant');
+      addNotification('Cannot move folder into its descendant', 'error');
+      return;
+    }
     
     try {
+      console.log('🚀 Calling API to move folder...');
       // Call backend API to persist the move
-      await apiService.moveFolder(folderId, newParentId);
+      const updatedFolder = await apiService.moveFolder(folderId, newParentId);
+      console.log('✅ API call successful, updated folder:', updatedFolder);
       
-      // Update frontend state
-      setFolders(prevFolders =>
-        prevFolders.map(folder =>
+      // Update frontend state with the updated folder data
+      setFolders(prevFolders => {
+        const newFolders = prevFolders.map(folder =>
           folder.id === folderId ? { ...folder, parentId: newParentId } : folder
-        )
-      );
+        ).sort((a, b) => a.name.localeCompare(b.name));
+        console.log('🔄 Updated folders state:', newFolders);
+        return newFolders;
+      });
       
-      addNotification('Folder moved successfully', 'success');
+      const folderName = folders.find(f => f.id === folderId)?.name || 'Unknown';
+      const targetName = newParentId ? folders.find(f => f.id === newParentId)?.name || 'Unknown' : 'root';
+      addNotification(`Folder "${folderName}" moved to "${targetName}" successfully`, 'success');
     } catch (error: any) {
-      console.error('Failed to move folder:', error);
+      console.error('❌ Failed to move folder:', error);
       addNotification(error.message || 'Failed to move folder', 'error');
     }
   };
