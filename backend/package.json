@@ -34,6 +34,9 @@
   },
   "optionalDependencies": {
     "@google-cloud/secret-manager": "^6.0.1",
+    "aws-sdk": "^2.1691.0",
+    "@azure/keyvault-secrets": "^4.8.0",
+    "@azure/identity": "^4.4.1",
     "pg": "^8.11.3",
     "mysql2": "^3.9.7"
   },

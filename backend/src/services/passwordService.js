@@ -1,20 +1,18 @@
-// Gracefully handle missing Secret Manager dependency
-let SecretManagerServiceClient;
-try {
-  ({ SecretManagerServiceClient } = require('@google-cloud/secret-manager'));
-} catch (error) {
-  console.log('Secret Manager package not available. Password security features will be limited.');
-}
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const SecretManagerService = require('./secretManagerService');
 
 class PasswordService {
   constructor() {
-    this.projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
-    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true' && SecretManagerServiceClient;
+    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true';
     
     if (this.useSecretManager) {
-      this.client = new SecretManagerServiceClient();
+      try {
+        this.secretManager = new SecretManagerService();
+      } catch (error) {
+        console.log('Secret Manager not available, falling back to traditional hashing:', error.message);
+        this.useSecretManager = false;
+      }
     }
     
     // Fallback to traditional password hashing if Secret Manager is disabled
@@ -44,37 +42,18 @@ class PasswordService {
       const secretName = `user-password-${userId}-${Date.now()}`;
       
       // Store hashed password in Secret Manager
-      const parent = `projects/${this.projectId}`;
-      const secretId = secretName;
-      
-      // Create the secret
-      const [secret] = await this.client.createSecret({
-        parent: parent,
-        secretId: secretId,
-        secret: {
-          replication: {
-            automatic: {},
-          },
-          labels: {
-            type: 'user-password',
-            userId: userId.toString(),
-            createdAt: Date.now().toString()
-          }
-        },
+      await this.secretManager.createSecret(secretName, passwordHash, {
+        type: 'user-password',
+        userId: userId.toString(),
+        createdAt: Date.now().toString(),
+        description: `Password for user ${userId}`
       });
 
-      // Add the password hash as a version
-      const [version] = await this.client.addSecretVersion({
-        parent: secret.name,
-        payload: {
-          data: Buffer.from(passwordHash),
-        },
-      });
-
-      console.log(`Password stored securely for user ${userId}: ${version.name}`);
+      console.log(`Password stored securely for user ${userId}: ${secretName}`);
       
       // Return the secret reference instead of the hash
-      return `gcp-secret:${secretName}`;
+      const provider = this.secretManager.provider || 'gcp';
+      return `${provider}-secret:${secretName}`;
       
     } catch (error) {
       console.error('Error storing password in Secret Manager:', error);
@@ -95,8 +74,8 @@ class PasswordService {
       return false;
     }
 
-    // Check if this is a Secret Manager reference
-    if (storedPasswordRef.startsWith('gcp-secret:')) {
+    // Check if this is a Secret Manager reference (multi-cloud support)
+    if (storedPasswordRef.includes('-secret:')) {
       return await this.verifyPasswordFromSecretManager(password, storedPasswordRef);
     }
     
@@ -117,14 +96,10 @@ class PasswordService {
    */
   async verifyPasswordFromSecretManager(password, secretRef) {
     try {
-      const secretName = secretRef.replace('gcp-secret:', '');
-      const name = `projects/${this.projectId}/secrets/${secretName}/versions/latest`;
+      // Extract provider and secret name (e.g., "gcp-secret:user-password-1-123456")
+      const [provider, secretName] = secretRef.split('-secret:');
       
-      const [version] = await this.client.accessSecretVersion({
-        name: name,
-      });
-
-      const passwordHash = version.payload.data.toString();
+      const passwordHash = await this.secretManager.getSecret(secretName);
       return await bcrypt.compare(password, passwordHash);
       
     } catch (error) {
