@@ -17,9 +17,9 @@ steps:
 
   # Build and push backend image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$SHORT_SHA', '-f', 'backend/Dockerfile', 'backend/']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA', '-f', 'backend/Dockerfile', 'backend/']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$SHORT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA']
 
   # Build and push frontend image with build args
   - name: 'gcr.io/cloud-builders/docker'
@@ -29,7 +29,7 @@ steps:
       - |
         GEMINI_API_KEY=$(cat gemini_api_key.txt)
         docker build \
-          -t gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA \
+          -t gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA \
           -f frontend/Dockerfile \
           --build-arg VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app \
           --build-arg VITE_ENVIRONMENT=gcp-cloud-run \
@@ -38,7 +38,7 @@ steps:
           frontend/
     waitFor: ['fetch-secrets']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA']
 
   # Deploy backend to Cloud Run with secrets
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -46,7 +46,7 @@ steps:
     args:
       [
         'run', 'deploy', '${_BACKEND_SERVICE}',
-        '--image', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$SHORT_SHA',
+        '--image', 'gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA',
         '--platform', 'managed',
         '--region', '${_REGION}',
         '--allow-unauthenticated',
@@ -64,7 +64,7 @@ steps:
     args:
       [
         'run', 'deploy', '${_FRONTEND_SERVICE}',
-        '--image', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$SHORT_SHA',
+        '--image', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA',
         '--platform', 'managed',
         '--region', '${_REGION}',
         '--allow-unauthenticated',
