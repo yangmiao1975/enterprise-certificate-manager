@@ -141,16 +141,26 @@ router.post('/register', validateRegister, async (req, res, next) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Create user with generated ID (compatible with current DB schema)
+    const userId = `user-${Date.now()}`;
 
-    // Create user (let SQLite auto-generate the ID)
-    const result = await db.runAsync(
-      'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
-      [username, email, passwordHash, role || 'viewer', 1]
+    // Hash password securely (will use Secret Manager if enabled)
+    const passwordService = getPasswordService ? getPasswordService() : null;
+    let passwordHash;
+    
+    if (passwordService && passwordService.useSecretManager) {
+      passwordHash = await passwordService.hashAndStorePassword(userId, password);
+    } else {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    // Insert user into database
+    await db.runAsync(
+      'INSERT INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, username, email, passwordHash, role || 'viewer', 1]
     );
 
-    const newUser = await db.getAsync('SELECT id, username, email, role FROM users WHERE id = ?', [result.lastID]);
+    const newUser = await db.getAsync('SELECT id, username, email, role FROM users WHERE id = ?', [userId]);
 
     res.status(201).json({
       message: 'User created successfully',
