@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 import gcpCertificateService from '../services/gcpCertificateService.js';
 import { parseCertificate } from '../utils/certificateParser.js';
 import { validateCertificateUpload } from '../middleware/validation.js';

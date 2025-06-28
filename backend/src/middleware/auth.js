@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 
 export const authMiddleware = async (req, res, next) => {
   try {

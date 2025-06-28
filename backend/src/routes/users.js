@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 import { requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();

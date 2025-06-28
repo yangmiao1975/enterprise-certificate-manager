@@ -1,6 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 import { validateFolder, validateId } from '../middleware/validation.js';
 import { requirePermission } from '../middleware/auth.js';
 
