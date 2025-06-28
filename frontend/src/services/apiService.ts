@@ -56,6 +56,7 @@ export interface ApiService {
   deleteCertificate(id: string): Promise<{ message: string }>;
   renewCertificate(id: string): Promise<{ message: string }>;
   downloadCertificate(id: string): Promise<string>;
+  downloadCertificateFile(id: string, filename?: string): Promise<string>;
   assignCertificateToFolder(certificateId: string, folderId: string | null): Promise<Certificate>;
   
   // Folders
@@ -142,6 +143,41 @@ class RealApiService implements ApiService {
       responseType: 'text',
     });
     return response.data;
+  }
+
+  async downloadCertificateFile(id: string, filename?: string) {
+    const response = await this.client.get(`/certificates/${id}/download`, {
+      responseType: 'blob',
+    });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Use provided filename or get from Content-Disposition header
+    let downloadFilename = filename;
+    if (!downloadFilename) {
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const matches = /filename="([^"]*)"/.exec(contentDisposition);
+        downloadFilename = matches?.[1] || 'certificate.pem';
+      } else {
+        downloadFilename = 'certificate.pem';
+      }
+    }
+    
+    link.download = downloadFilename;
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return downloadFilename;
   }
 
   async assignCertificateToFolder(certificateId: string, folderId: string | null) {

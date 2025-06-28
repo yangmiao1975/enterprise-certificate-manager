@@ -4,23 +4,30 @@ import SecretManagerService from './secretManagerService.js';
 
 class PasswordService {
   constructor() {
-    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true';
+    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true' && process.env.NODE_ENV !== 'production';
     this.secretManagerInitialized = false;
+    this.initializationPromise = null;
+    
+    // Disable Secret Manager in production for stability unless explicitly configured
+    if (process.env.NODE_ENV === 'production' && !process.env.FORCE_SECRET_MANAGER) {
+      console.log('🔒 Production mode: Using traditional password hashing for stability');
+      this.useSecretManager = false;
+    }
     
     if (this.useSecretManager) {
       try {
         this.secretManager = new SecretManagerService();
-        // Initialize async
-        this.initializeSecretManager();
+        // Initialize async and store promise for proper waiting
+        this.initializationPromise = this.initializeSecretManager();
       } catch (error) {
-        console.log('Secret Manager not available, falling back to traditional hashing:', error.message);
+        console.log('⚠️ Secret Manager not available, falling back to traditional hashing:', error.message);
         this.useSecretManager = false;
       }
     }
     
     // Fallback to traditional password hashing if Secret Manager is disabled
     if (!this.useSecretManager) {
-      console.log('Using traditional password hashing (not Secret Manager)');
+      console.log('🔐 Using traditional password hashing (bcrypt)');
     }
   }
 
@@ -41,23 +48,28 @@ class PasswordService {
    * @returns {Promise<string>} - Password reference/hash
    */
   async hashAndStorePassword(userId, password) {
+    // Always fallback to bcrypt if Secret Manager is disabled
     if (!this.useSecretManager) {
-      // Traditional bcrypt hashing for local development
-      return await bcrypt.hash(password, 12);
-    }
-
-    // Wait for Secret Manager initialization if needed
-    if (!this.secretManagerInitialized && this.secretManager) {
-      await this.initializeSecretManager();
-    }
-
-    // Check if Secret Manager is actually available
-    if (!this.secretManagerInitialized || !this.secretManager?.isAvailable) {
-      console.log('Secret Manager not available, using traditional hashing');
+      console.log('🔐 Using bcrypt for password hashing');
       return await bcrypt.hash(password, 12);
     }
 
     try {
+      // Wait for Secret Manager initialization with timeout
+      if (this.initializationPromise && !this.secretManagerInitialized) {
+        console.log('⏳ Waiting for Secret Manager initialization...');
+        await Promise.race([
+          this.initializationPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Secret Manager initialization timeout')), 5000))
+        ]);
+      }
+
+      // Check if Secret Manager is actually available
+      if (!this.secretManagerInitialized || !this.secretManager?.isAvailable) {
+        console.log('⚠️ Secret Manager not available, using traditional hashing');
+        return await bcrypt.hash(password, 12);
+      }
+
       // Generate strong password hash
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
@@ -65,24 +77,27 @@ class PasswordService {
       // Create unique secret name for this user
       const secretName = `user-password-${userId}-${Date.now()}`;
       
-      // Store hashed password in Secret Manager
-      await this.secretManager.createSecret(secretName, passwordHash, {
-        type: 'user-password',
-        userId: userId.toString(),
-        createdAt: Date.now().toString(),
-        description: `Password for user ${userId}`
-      });
+      // Store hashed password in Secret Manager with timeout
+      await Promise.race([
+        this.secretManager.createSecret(secretName, passwordHash, {
+          type: 'user-password',
+          userId: userId.toString(),
+          createdAt: Date.now().toString(),
+          description: `Password for user ${userId}`
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Secret Manager store timeout')), 10000))
+      ]);
 
-      console.log(`Password stored securely for user ${userId}: ${secretName}`);
+      console.log(`✅ Password stored securely for user ${userId}: ${secretName}`);
       
       // Return the secret reference instead of the hash
       const provider = this.secretManager.provider || 'gcp';
       return `${provider}-secret:${secretName}`;
       
     } catch (error) {
-      console.error('Error storing password in Secret Manager:', error);
-      // Fallback to traditional hashing
-      console.log('Falling back to traditional password hashing');
+      console.error('❌ Error storing password in Secret Manager:', error.message);
+      // Always fallback to traditional hashing on any error
+      console.log('🔄 Falling back to traditional password hashing');
       return await bcrypt.hash(password, 12);
     }
   }

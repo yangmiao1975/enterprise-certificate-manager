@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getDatabase } from '../database/init.js';
-import { promisify } from 'util';
+import { getDatabase } from '../database/flexible-init.js';
 
 const API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -159,28 +158,44 @@ INSTRUCTIONS:
 - If asked about specific certificates, reference the database data
 - For security advice, provide industry best practices`;
 
-    // Convert chat history to Gemini format
-    const geminiHistory = messages.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }]
-    }));
+    // Convert chat history to proper format for generateContent
+    const contents = [];
+    
+    // Add system instruction as the first message
+    contents.push({
+      role: 'user',
+      parts: [{ text: systemInstruction }]
+    });
+    
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'I understand. I am ready to help with certificate management questions based on your database context.' }]
+    });
 
-    // Create chat session
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
+    // Add chat history
+    messages.forEach(msg => {
+      contents.push({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      });
+    });
+
+    // Add the new message
+    contents.push({
+      role: 'user',
+      parts: [{ text: newMessage }]
+    });
+
+    // Generate response using the correct API
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: contents,
       config: {
-        systemInstruction: systemInstruction,
         temperature: 0.7,
         topP: 0.8,
         topK: 40,
         maxOutputTokens: 2048,
-      },
-      history: geminiHistory
-    });
-
-    // Send message
-    const response = await chat.sendMessage({
-      message: newMessage
+      }
     });
 
     return {
@@ -274,8 +289,11 @@ Please provide:
 Format your response in clear sections with actionable insights.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
+      model: 'gemini-1.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
       config: {
         temperature: 0.3,
         topP: 0.8,
@@ -352,8 +370,11 @@ Please provide:
 Format as actionable insights with priorities (High/Medium/Low).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
+      model: 'gemini-1.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
       config: {
         temperature: 0.4,
         topP: 0.9,
@@ -429,8 +450,11 @@ If the certificate is invalid, return:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
+      model: 'gemini-1.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
       config: {
         responseMimeType: "application/json",
         temperature: 0.1,

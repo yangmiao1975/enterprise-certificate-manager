@@ -1,7 +1,7 @@
 import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getChatResponseWithDB, analyzeCertificateWithDB, getDatabaseInsights, parseCertificateWithGemini } from '../services/geminiService.js';
-import { getDatabase } from '../database/init.js';
+import { getDatabase } from '../database/flexible-init.js';
 
 const router = express.Router();
 

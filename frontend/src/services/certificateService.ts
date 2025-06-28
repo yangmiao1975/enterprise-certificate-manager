@@ -46,6 +46,7 @@ export const addCertificate = apiService.uploadCertificate.bind(apiService);
 export const deleteCertificate = apiService.deleteCertificate.bind(apiService);
 export const renewCertificate = apiService.renewCertificate.bind(apiService);
 export const downloadCertificate = apiService.downloadCertificate.bind(apiService);
+export const downloadCertificateFile = apiService.downloadCertificateFile.bind(apiService);
 
 export const getCertificatesByFolder = async (folderId: string): Promise<Certificate[]> => {
   const currentUser = getCurrentUser();

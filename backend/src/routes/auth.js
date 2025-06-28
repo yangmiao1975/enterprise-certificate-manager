@@ -2,11 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDatabase } from '../database/init.js';
-// TODO: Update to use flexible database and password service
-// import { getDatabase, getPasswordService } from '../database/flexible-init.js';
-
-import PasswordService from '../services/passwordService.js';
+import { getDatabase, getPasswordService } from '../database/flexible-init.js';
 import { validateLogin, validateRegister } from '../middleware/validation.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
@@ -134,47 +130,128 @@ router.post('/login', validateLogin, async (req, res, next) => {
 // Register (admin only)
 router.post('/register', validateRegister, async (req, res, next) => {
   try {
+    console.log('📝 Starting user registration process...');
     const { username, email, password, role } = req.body;
+    
+    // Validate required fields
+    if (!username || !email || !password) {
+      console.error('❌ Missing required fields for registration');
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
+    console.log(`👤 Registering user: ${username} (${email}) with role: ${role || 'viewer'}`);
+    
     const db = getDatabase();
 
     // Check if user already exists
+    console.log('🔍 Checking if user already exists...');
     const existingUser = await db.getAsync('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
     if (existingUser) {
+      console.log('⚠️ User already exists:', existingUser.id);
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password securely (will use Secret Manager if enabled)
-    const passwordService = new PasswordService();
+    // Hash password securely - always use bcrypt as fallback for reliability
+    console.log('🔐 Hashing password...');
     let passwordHash;
     
-    // Insert user into database (let SQLite auto-generate the ID)
+    try {
+      const passwordService = getPasswordService();
+      
+      // Always use traditional bcrypt in production for reliability
+      // Secret Manager can be enabled later once properly configured
+      if (passwordService && passwordService.useSecretManager && process.env.NODE_ENV !== 'production') {
+        console.log('🔑 Attempting to use Secret Manager for password storage...');
+        try {
+          // Wait a bit for Secret Manager initialization
+          await new Promise(resolve => setTimeout(resolve, 100));
+          passwordHash = await passwordService.hashAndStorePassword('temp-id', password);
+          console.log('✅ Password stored using Secret Manager');
+        } catch (smError) {
+          console.log('⚠️ Secret Manager failed, falling back to bcrypt:', smError.message);
+          passwordHash = await bcrypt.hash(password, 12);
+        }
+      } else {
+        console.log('🔒 Using traditional bcrypt for password hashing');
+        passwordHash = await bcrypt.hash(password, 12);
+      }
+    } catch (hashError) {
+      console.error('❌ Password hashing failed:', hashError.message);
+      // Ultimate fallback - use bcrypt directly
+      passwordHash = await bcrypt.hash(password, 12);
+    }
+    
+    // Insert user into database with hashed password
+    console.log('💾 Inserting user into database...');
     const result = await db.runAsync(
       'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
-      [username, email, 'temp', role || 'viewer', 1]
+      [username, email, passwordHash, role || 'viewer', 1]
     );
 
-    const userId = result.lastID;
+    console.log('🔍 Database result:', result);
     
-    if (passwordService.useSecretManager) {
-      passwordHash = await passwordService.hashAndStorePassword(userId, password);
+    // Handle different database result formats
+    let userId;
+    if (result && result.lastID) {
+      userId = result.lastID;
+    } else if (result && result.insertId) {
+      userId = result.insertId;
     } else {
-      passwordHash = await bcrypt.hash(password, 10);
+      // Fallback: query for the user we just created
+      console.log('🔄 Fallback: Querying for newly created user...');
+      const newUser = await db.getAsync('SELECT id FROM users WHERE username = ? AND email = ?', [username, email]);
+      if (newUser && newUser.id) {
+        userId = newUser.id;
+      } else {
+        throw new Error('Failed to create user or retrieve user ID');
+      }
+    }
+    
+    console.log(`✅ User created with ID: ${userId}`);
+
+    // If we used Secret Manager with temp-id, update the password with real user ID
+    if (passwordHash && passwordHash.includes('-secret:') && passwordService.useSecretManager) {
+      try {
+        console.log('🔄 Updating Secret Manager password with real user ID...');
+        const realPasswordHash = await passwordService.hashAndStorePassword(userId, password);
+        await db.runAsync('UPDATE users SET password_hash = ? WHERE id = ?', [realPasswordHash, userId]);
+        console.log('✅ Password updated with real user ID in Secret Manager');
+      } catch (updateError) {
+        console.error('⚠️ Failed to update password with real user ID, keeping bcrypt hash:', updateError.message);
+        // Keep the bcrypt hash if Secret Manager update fails
+      }
     }
 
-    // Update the password hash
-    await db.runAsync(
-      'UPDATE users SET password_hash = ? WHERE id = ?',
-      [passwordHash, userId]
-    );
-
+    // Retrieve the created user (without password hash)
     const newUser = await db.getAsync('SELECT id, username, email, role FROM users WHERE id = ?', [userId]);
+    
+    if (!newUser) {
+      console.error('❌ Failed to retrieve created user');
+      return res.status(500).json({ error: 'User created but failed to retrieve user data' });
+    }
 
+    console.log('🎉 User registration completed successfully:', newUser);
     res.status(201).json({
       message: 'User created successfully',
       user: newUser
     });
+    
   } catch (error) {
-    next(error);
+    console.error('❌ Registration error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    
+    // Send user-friendly error message
+    const errorMessage = error.message && error.message.includes('UNIQUE constraint failed') 
+      ? 'User already exists'
+      : 'Failed to create user account';
+      
+    res.status(500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
