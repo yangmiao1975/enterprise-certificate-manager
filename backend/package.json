@@ -30,10 +30,12 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "sqlite3": "^5.1.6",
-    "@google-cloud/secret-manager": "^5.11.0",
-    "pg": "^8.11.3",
-    "mysql2": "^3.9.7",
     "uuid": "^9.0.1"
+  },
+  "optionalDependencies": {
+    "@google-cloud/secret-manager": "^6.0.1",
+    "pg": "^8.11.3",
+    "mysql2": "^3.9.7"
   },
   "devDependencies": {
     "jest": "^29.7.0",

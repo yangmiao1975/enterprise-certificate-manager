@@ -60,6 +60,11 @@ class DatabaseConfig {
   }
 
   async createPostgreSQLConnection() {
+    try {
+      const { Pool } = require('pg');
+    } catch (error) {
+      throw new Error('PostgreSQL support requires "pg" package. Install with: npm install pg');
+    }
     const { Pool } = require('pg');
     
     const pool = new Pool({
@@ -109,6 +114,11 @@ class DatabaseConfig {
   }
 
   async createMySQLConnection() {
+    try {
+      const mysql = require('mysql2/promise');
+    } catch (error) {
+      throw new Error('MySQL support requires "mysql2" package. Install with: npm install mysql2');
+    }
     const mysql = require('mysql2/promise');
     
     const pool = mysql.createPool({

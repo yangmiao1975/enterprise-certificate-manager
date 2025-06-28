@@ -1,12 +1,21 @@
-const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+// Gracefully handle missing Secret Manager dependency
+let SecretManagerServiceClient;
+try {
+  ({ SecretManagerServiceClient } = require('@google-cloud/secret-manager'));
+} catch (error) {
+  console.log('Secret Manager package not available. Password security features will be limited.');
+}
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 class PasswordService {
   constructor() {
-    this.client = new SecretManagerServiceClient();
     this.projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
-    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true';
+    this.useSecretManager = process.env.USE_SECRET_MANAGER_PASSWORDS === 'true' && SecretManagerServiceClient;
+    
+    if (this.useSecretManager) {
+      this.client = new SecretManagerServiceClient();
+    }
     
     // Fallback to traditional password hashing if Secret Manager is disabled
     if (!this.useSecretManager) {
