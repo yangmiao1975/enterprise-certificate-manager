@@ -233,5 +233,8 @@ class RealApiService implements ApiService {
 // Export the real API service only
 export const apiService: ApiService = new RealApiService();
 
+// Also export as default for compatibility
+export default apiService;
+
 // Export preview mode status
 export const isPreviewModeEnabled = isPreviewMode; 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { apiService } from '../services/apiService';
+import apiService from '../services/apiService';
 
 interface LoginProps {
   onLogin: () => void;
@@ -57,7 +57,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google';
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    const oauthUrl = apiUrl ? `${apiUrl}/api/auth/google` : '/api/auth/google';
+    window.location.href = oauthUrl;
   };
 
   return (
