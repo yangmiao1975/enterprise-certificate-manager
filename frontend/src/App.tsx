@@ -457,8 +457,11 @@ Enterprise Certificate Manager (Simulated Email System)`;
   const handleAssignCertificateToFolder = async (certificateId: string, targetFolderId: string | null) => {
     setIsFolderActionLoading(true);
     try {
-        const updatedCert = await apiAssignCertificateToFolder(certificateId, targetFolderId);
-        if (updatedCert) {
+        const updatedCertApi = await apiAssignCertificateToFolder(certificateId, targetFolderId);
+        if (updatedCertApi) {
+            // Convert API response to frontend format
+            const updatedCert = mapCertificateApiToFrontend(updatedCertApi);
+            
             setAllCertificates(prevCerts =>
                 prevCerts.map(c => (c.id === certificateId ? updatedCert : c))
             );
