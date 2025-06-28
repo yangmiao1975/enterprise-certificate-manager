@@ -46,6 +46,16 @@ const CertificateRow: React.FC<CertificateRowProps> = ({ certificate, onRenew, o
           {certificate.status}
         </span>
       </td>
+      <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400 hidden xl:table-cell">
+        <div className="flex flex-col">
+          <span>{formatDate(certificate.uploadedAt)}</span>
+          {certificate.renewalCount && certificate.renewalCount > 0 && (
+            <span className="text-xs text-blue-600 dark:text-blue-400">
+              Renewed {certificate.renewalCount}x
+            </span>
+          )}
+        </div>
+      </td>
       <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
         <div className="flex items-center space-x-1">
           <ActionButton 

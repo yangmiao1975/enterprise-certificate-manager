@@ -199,6 +199,8 @@ Enterprise Certificate Manager (Simulated Email System)`;
       folderId: cert.folder_id,
       uploadedBy: cert.uploaded_by,
       uploadedAt: cert.uploaded_at,
+      updatedAt: cert.updated_at,
+      renewalCount: cert.renewal_count || 0,
       isTemp: cert.is_temp,
       // Add any other fields as needed
     };
@@ -263,11 +265,22 @@ Enterprise Certificate Manager (Simulated Email System)`;
   const handleRenewCertificate = async (id: string) => {
     setRenewingCertId(id);
     try {
-      await apiRenewCertificate(id); // Only show notification, do not update state with response
-      addNotification(`Certificate renewal initiated.`, 'success');
-      // Optionally, refetch certificates here to update status
-      // const certsData = await getCertificates();
-      // setAllCertificates(certsData);
+      const renewalResponse = await apiRenewCertificate(id);
+      
+      // If renewal includes updated certificate data, update state
+      if (renewalResponse.certificate) {
+        const updatedCert = mapCertificateApiToFrontend(renewalResponse.certificate);
+        setAllCertificates(prevCerts =>
+          prevCerts.map(c => (c.id === id ? updatedCert : c))
+        );
+        addNotification(`Certificate renewed successfully. Updated at ${new Date(updatedCert.updatedAt || '').toLocaleString()}`, 'success');
+      } else {
+        addNotification(`Certificate renewal initiated.`, 'success');
+        
+        // Optionally refetch all certificates to get updated data
+        const settings = loadNotificationSettings();
+        fetchAllData(settings);
+      }
     } catch (err) {
       addNotification('An error occurred while renewing certificate.', 'error');
     } finally {

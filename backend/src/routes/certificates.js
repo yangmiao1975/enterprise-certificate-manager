@@ -135,8 +135,8 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
       INSERT INTO certificates (
         id, common_name, issuer, subject, valid_from, valid_to, 
         algorithm, serial_number, status, pem_content, folder_id, 
-        uploaded_by, uploaded_at, gcp_certificate_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        uploaded_by, uploaded_at, updated_at, renewal_count, gcp_certificate_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       certificateId,
       certificateData.commonName,
@@ -151,6 +151,8 @@ router.post('/', upload.single('certificate'), validateCertificateUpload, async 
       folderId || null,
       userId,
       now,
+      now, // Set updated_at same as uploaded_at initially
+      0,   // Initial renewal count is 0
       gcpResult.gcpCertificateName
     ]);
     console.log('[Route] Database insert successful');
@@ -255,7 +257,28 @@ router.post('/:id/renew', async (req, res, next) => {
       }
     }
 
-    res.json({ message: 'Certificate renewal initiated' });
+    // Update renewal metadata in database
+    const currentRenewalCount = certificate.renewal_count || 0;
+    const now = new Date().toISOString();
+    
+    await db.runAsync(
+      'UPDATE certificates SET updated_at = ?, renewal_count = ? WHERE id = ?',
+      [now, currentRenewalCount + 1, id]
+    );
+
+    // Get updated certificate data
+    const updatedCertificate = await db.getAsync(`
+      SELECT c.*, f.name as folder_name, u.username as uploaded_by_username
+      FROM certificates c
+      LEFT JOIN folders f ON c.folder_id = f.id
+      LEFT JOIN users u ON c.uploaded_by = u.id
+      WHERE c.id = ?
+    `, [id]);
+
+    res.json({ 
+      message: 'Certificate renewal initiated',
+      certificate: updatedCertificate
+    });
   } catch (error) {
     next(error);
   }

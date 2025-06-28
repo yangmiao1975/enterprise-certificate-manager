@@ -98,12 +98,27 @@ async function createTables() {
       folder_id TEXT,
       uploaded_by TEXT,
       uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      renewal_count INTEGER DEFAULT 0,
       is_temp BOOLEAN DEFAULT 0,
       gcp_certificate_name TEXT,
       FOREIGN KEY (folder_id) REFERENCES folders (id),
       FOREIGN KEY (uploaded_by) REFERENCES users (id)
     )
   `);
+
+  // Add updated_at and renewal_count columns if they don't exist (for existing databases)
+  try {
+    await db.exec('ALTER TABLE certificates ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  
+  try {
+    await db.exec('ALTER TABLE certificates ADD COLUMN renewal_count INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore error
+  }
 
   // Metadata table
   await db.exec(`
@@ -118,6 +133,8 @@ async function createTables() {
   await db.exec('CREATE INDEX IF NOT EXISTS idx_certificates_folder ON certificates(folder_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_certificates_status ON certificates(status)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_certificates_valid_to ON certificates(valid_to)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_certificates_uploaded_at ON certificates(uploaded_at)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_certificates_updated_at ON certificates(updated_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_folders_type ON folders(type)');
 }

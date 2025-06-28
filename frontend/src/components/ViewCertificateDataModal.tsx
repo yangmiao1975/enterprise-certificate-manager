@@ -70,6 +70,28 @@ const ViewCertificateDataModal: React.FC<ViewCertificateDataModalProps> = ({ cer
             <DetailItem label="Valid From" value={new Date(certificate.validFrom).toUTCString()} />
             <DetailItem label="Valid To" value={new Date(certificate.validTo).toUTCString()} />
             <DetailItem label="Status" value={certificate.status} />
+            
+            {/* Certificate Management Metadata */}
+            <div className="py-3">
+                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Certificate Timeline</h4>
+                <div className="bg-slate-50 dark:bg-slate-700/50 rounded-md p-3 space-y-2">
+                    <DetailItem 
+                        label="Created" 
+                        value={certificate.uploadedAt ? new Date(certificate.uploadedAt).toUTCString() : 'N/A'} 
+                    />
+                    <DetailItem 
+                        label="Last Updated" 
+                        value={certificate.updatedAt ? new Date(certificate.updatedAt).toUTCString() : 'Not updated'} 
+                    />
+                    <DetailItem 
+                        label="Renewal Count" 
+                        value={certificate.renewalCount?.toString() || '0'} 
+                    />
+                    {certificate.uploadedBy && (
+                        <DetailItem label="Uploaded By" value={certificate.uploadedBy} />
+                    )}
+                </div>
+            </div>
         </dl>
 
         {mode === 'download' && certificate.pem && (

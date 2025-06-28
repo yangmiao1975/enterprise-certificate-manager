@@ -18,7 +18,9 @@ export interface Certificate {
   pem?: string; // For download simulation
   folderId?: string | null; // New: ID of the folder this certificate belongs to
   uploadedBy?: string; // User who uploaded the certificate
-  uploadedAt?: string; // ISO Date string
+  uploadedAt?: string; // ISO Date string - Certificate creation/upload time
+  updatedAt?: string; // ISO Date string - Last renewal/update time
+  renewalCount?: number; // Number of times certificate has been renewed
   isTemp?: boolean; // Indicates if certificate is in temp folder
 }
 
