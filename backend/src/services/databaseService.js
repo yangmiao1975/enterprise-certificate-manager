@@ -83,23 +83,23 @@ class DatabaseService {
 
     this.connection = new sqlite3.Database(dbPath);
     
+    // Add promisified helpers first
+    this.connection.getAsync = promisify(this.connection.get).bind(this.connection);
+    this.connection.allAsync = promisify(this.connection.all).bind(this.connection);
+    this.connection.runAsync = promisify(this.connection.run).bind(this.connection);
+    this.connection.execAsync = promisify(this.connection.exec).bind(this.connection);
+    
     // Enable WAL mode for better concurrency
     if (config.options?.enableWAL) {
-      await this.execAsync('PRAGMA journal_mode=WAL');
+      await this.connection.execAsync('PRAGMA journal_mode=WAL');
     }
     
     // Apply pragma settings
     if (config.options?.pragma) {
       for (const [key, value] of Object.entries(config.options.pragma)) {
-        await this.execAsync(`PRAGMA ${key}=${value}`);
+        await this.connection.execAsync(`PRAGMA ${key}=${value}`);
       }
     }
-
-    // Add promisified helpers
-    this.connection.getAsync = promisify(this.connection.get).bind(this.connection);
-    this.connection.allAsync = promisify(this.connection.all).bind(this.connection);
-    this.connection.runAsync = promisify(this.connection.run).bind(this.connection);
-    this.connection.execAsync = promisify(this.connection.exec).bind(this.connection);
 
     this.isConnected = true;
   }
