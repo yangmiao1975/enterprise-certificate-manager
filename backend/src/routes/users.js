@@ -63,11 +63,10 @@ router.post('/', requirePermission('system:settings'), async (req, res, next) =>
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
-    const userId = `user-${Date.now()}`;
-    await db.runAsync(
-      'INSERT INTO users (id, username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, username, email, passwordHash, role || 'viewer', 1]
+    // Create user (let SQLite auto-generate the ID)
+    const result = await db.runAsync(
+      'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
+      [username, email, passwordHash, role || 'viewer', 1]
     );
 
     const newUser = await db.getAsync(`
@@ -76,7 +75,7 @@ router.post('/', requirePermission('system:settings'), async (req, res, next) =>
       FROM users u
       LEFT JOIN roles r ON u.role = r.id
       WHERE u.id = ?
-    `, [userId]);
+    `, [result.lastID]);
 
     res.status(201).json(newUser);
   } catch (error) {
