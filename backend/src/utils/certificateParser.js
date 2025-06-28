@@ -47,8 +47,8 @@ export async function parseCertificate(fileContent, originalName = "") {
 
     return {
       commonName: commonName || 'Unknown',
-      issuer: cert.issuer,
-      subject: cert.subject,
+      issuer: cert.issuer || 'Unknown',
+      subject: cert.subject || cert.issuer || 'Unknown', // Use issuer as fallback if subject is empty
       validFrom: cert.notBefore instanceof Date && !isNaN(cert.notBefore) ? cert.notBefore.toISOString() : null,
       validTo: cert.notAfter instanceof Date && !isNaN(cert.notAfter) ? cert.notAfter.toISOString() : null,
       algorithm: cert.publicKey?.algorithm?.name || 'Unknown',
