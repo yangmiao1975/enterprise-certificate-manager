@@ -216,6 +216,19 @@ class DatabaseService {
       .replace(/BOOLEAN DEFAULT (\d+)/gi, 'BOOLEAN DEFAULT $1::boolean')
       // Convert INSERT OR IGNORE to INSERT ... ON CONFLICT DO NOTHING
       .replace(/INSERT OR IGNORE INTO/gi, 'INSERT INTO')
+      // Convert IF NOT EXISTS for CREATE INDEX (PostgreSQL doesn't support it)
+      .replace(/CREATE INDEX IF NOT EXISTS/gi, 'CREATE INDEX')
+      // Convert IF NOT EXISTS for CREATE TRIGGER (PostgreSQL doesn't support it)
+      .replace(/CREATE TRIGGER IF NOT EXISTS/gi, 'CREATE OR REPLACE FUNCTION')
+      // Convert SQLite parameter placeholders ? to PostgreSQL $1, $2, etc.
+      .replace(/\?/g, (match, offset, string) => {
+        const beforeMatch = string.substring(0, offset);
+        const paramCount = (beforeMatch.match(/\$/g) || []).length + 1;
+        return `$${paramCount}`;
+      })
+      // Convert AND active = 1 to AND active = true
+      .replace(/active\s*=\s*1/gi, 'active = true')
+      .replace(/active\s*=\s*0/gi, 'active = false')
       // Handle CURRENT_TIMESTAMP
       .replace(/DEFAULT CURRENT_TIMESTAMP/gi, 'DEFAULT CURRENT_TIMESTAMP');
   }

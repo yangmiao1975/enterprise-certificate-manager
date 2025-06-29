@@ -25,7 +25,7 @@ export const authMiddleware = async (req, res, next) => {
 
     // Get user role and permissions
     const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [user.role]);
-    const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
+    const permissions = (role && role.permissions && typeof role.permissions === 'string') ? JSON.parse(role.permissions) : [];
 
     req.user = {
       ...user,
@@ -47,7 +47,7 @@ export const authMiddleware = async (req, res, next) => {
 
 export const requirePermission = (permission) => {
   return (req, res, next) => {
-    if (!req.user.permissions.includes(permission)) {
+    if (!req.user || !Array.isArray(req.user.permissions) || !req.user.permissions.includes(permission)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();
@@ -56,7 +56,7 @@ export const requirePermission = (permission) => {
 
 export const requireRole = (role) => {
   return (req, res, next) => {
-    if (req.user.role !== role) {
+    if (!req.user || req.user.role !== role) {
       return res.status(403).json({ error: 'Insufficient role' });
     }
     next();

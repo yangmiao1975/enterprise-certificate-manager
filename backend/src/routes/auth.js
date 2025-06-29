@@ -99,7 +99,7 @@ router.post('/login', validateLogin, async (req, res, next) => {
 
     // Get user role and permissions
     const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [user.role]);
-    const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
+    const permissions = (role && role.permissions && typeof role.permissions === 'string') ? JSON.parse(role.permissions) : [];
 
     // Generate JWT token
     const token = jwt.sign(
@@ -267,7 +267,7 @@ router.get('/me', authMiddleware, async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' });
     }
     const role = await db.getAsync('SELECT * FROM roles WHERE id = ?', [user.role]);
-    const permissions = (role && role.permissions && role.permissions !== 'undefined') ? JSON.parse(role.permissions) : [];
+    const permissions = (role && role.permissions && typeof role.permissions === 'string') ? JSON.parse(role.permissions) : [];
     res.json({
       ...user,
       permissions
