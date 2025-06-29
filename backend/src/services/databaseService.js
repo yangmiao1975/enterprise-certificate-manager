@@ -410,7 +410,7 @@ class DatabaseService {
           status VARCHAR(50) NOT NULL,
           pem_content TEXT,
           folder_id VARCHAR(255),
-          uploaded_by VARCHAR(255),
+          uploaded_by INTEGER,
           uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           is_temp BOOLEAN DEFAULT false,
           gcp_certificate_name VARCHAR(255),
