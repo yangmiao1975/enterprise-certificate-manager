@@ -143,7 +143,9 @@ class DatabaseService {
         getAsync: async (sql, params = []) => {
           const client = await this.connectionPool.connect();
           try {
-            const result = await client.query(this.convertSQLiteToPostgreSQL(sql), params);
+            const convertedSQL = this.convertSQLiteToPostgreSQL(sql);
+            const convertedParams = this.convertParametersForPostgreSQL(params);
+            const result = await client.query(convertedSQL, convertedParams);
             return result.rows[0] || null;
           } finally {
             client.release();
@@ -153,7 +155,9 @@ class DatabaseService {
         allAsync: async (sql, params = []) => {
           const client = await this.connectionPool.connect();
           try {
-            const result = await client.query(this.convertSQLiteToPostgreSQL(sql), params);
+            const convertedSQL = this.convertSQLiteToPostgreSQL(sql);
+            const convertedParams = this.convertParametersForPostgreSQL(params);
+            const result = await client.query(convertedSQL, convertedParams);
             return result.rows;
           } finally {
             client.release();
@@ -163,7 +167,9 @@ class DatabaseService {
         runAsync: async (sql, params = []) => {
           const client = await this.connectionPool.connect();
           try {
-            const result = await client.query(this.convertSQLiteToPostgreSQL(sql), params);
+            const convertedSQL = this.convertSQLiteToPostgreSQL(sql);
+            const convertedParams = this.convertParametersForPostgreSQL(params);
+            const result = await client.query(convertedSQL, convertedParams);
             return {
               lastID: result.rows[0]?.id || null,
               changes: result.rowCount
@@ -207,15 +213,13 @@ class DatabaseService {
    * @returns {String} PostgreSQL compatible SQL
    */
   convertSQLiteToPostgreSQL(sql) {
-    return sql
+    let convertedSQL = sql
       // Convert AUTOINCREMENT to SERIAL
       .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY')
       // Convert DATETIME to TIMESTAMP
       .replace(/DATETIME/gi, 'TIMESTAMP')
       // Convert BOOLEAN DEFAULT to proper PostgreSQL syntax
       .replace(/BOOLEAN DEFAULT (\d+)/gi, 'BOOLEAN DEFAULT $1::boolean')
-      // Convert INSERT OR IGNORE to INSERT ... ON CONFLICT DO NOTHING
-      .replace(/INSERT OR IGNORE INTO/gi, 'INSERT INTO')
       // Convert IF NOT EXISTS for CREATE INDEX (PostgreSQL doesn't support it)
       .replace(/CREATE INDEX IF NOT EXISTS/gi, 'CREATE INDEX')
       // Convert IF NOT EXISTS for CREATE TRIGGER (PostgreSQL doesn't support it)
@@ -231,6 +235,40 @@ class DatabaseService {
       .replace(/active\s*=\s*0/gi, 'active = false')
       // Handle CURRENT_TIMESTAMP
       .replace(/DEFAULT CURRENT_TIMESTAMP/gi, 'DEFAULT CURRENT_TIMESTAMP');
+
+    // Handle INSERT OR IGNORE conversion with proper ON CONFLICT
+    if (convertedSQL.includes('INSERT OR IGNORE INTO')) {
+      if (convertedSQL.includes('roles')) {
+        convertedSQL = convertedSQL.replace(/INSERT OR IGNORE INTO roles/gi, 'INSERT INTO roles');
+        convertedSQL += ' ON CONFLICT (id) DO NOTHING';
+      } else if (convertedSQL.includes('users')) {
+        convertedSQL = convertedSQL.replace(/INSERT OR IGNORE INTO users/gi, 'INSERT INTO users');
+        convertedSQL += ' ON CONFLICT (username) DO NOTHING';
+      } else {
+        // Generic fallback
+        convertedSQL = convertedSQL.replace(/INSERT OR IGNORE INTO/gi, 'INSERT INTO');
+      }
+    }
+
+    return convertedSQL;
+  }
+
+  /**
+   * Convert SQLite parameter values to PostgreSQL compatible types
+   * @param {Array} params - Parameter array
+   * @returns {Array} PostgreSQL compatible parameters
+   */
+  convertParametersForPostgreSQL(params) {
+    return params.map(param => {
+      // Convert SQLite boolean numbers to PostgreSQL booleans
+      if (param === 1 || param === '1') return true;
+      if (param === 0 || param === '0') return false;
+      
+      // Ensure null values are properly handled
+      if (param === undefined) return null;
+      
+      return param;
+    });
   }
 
   /**
@@ -516,18 +554,10 @@ class DatabaseService {
 
     for (const role of roles) {
       try {
-        if (this.provider === 'sqlite') {
-          await this.connection.runAsync(
-            'INSERT OR IGNORE INTO roles (id, name, description, permissions) VALUES (?, ?, ?, ?)',
-            [role.id, role.name, role.description, role.permissions]
-          );
-        } else {
-          // PostgreSQL: INSERT ... ON CONFLICT DO NOTHING
-          await this.connection.runAsync(
-            'INSERT INTO roles (id, name, description, permissions) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
-            [role.id, role.name, role.description, role.permissions]
-          );
-        }
+        await this.connection.runAsync(
+          'INSERT OR IGNORE INTO roles (id, name, description, permissions) VALUES (?, ?, ?, ?)',
+          [role.id, role.name, role.description, role.permissions]
+        );
       } catch (error) {
         console.error(`Error inserting role ${role.id}:`, error.message);
       }
@@ -546,17 +576,10 @@ class DatabaseService {
         const bcrypt = await import('bcryptjs');
         const passwordHash = await bcrypt.default.hash('admin123', 10);
         
-        if (this.provider === 'sqlite') {
-          await this.connection.runAsync(
-            'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
-            ['admin', 'admin@example.com', passwordHash, 'admin', 1]
-          );
-        } else {
-          await this.connection.runAsync(
-            'INSERT INTO users (username, email, password_hash, role, active) VALUES ($1, $2, $3, $4, $5)',
-            ['admin', 'admin@example.com', passwordHash, 'admin', true]
-          );
-        }
+        await this.connection.runAsync(
+          'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
+          ['admin', 'admin@example.com', passwordHash, 'admin', 1]
+        );
         console.log('  ✓ Default admin user created');
       }
     } catch (error) {

@@ -34,7 +34,7 @@ passport.use(new GoogleStrategy({
       // Create new user
       await db.runAsync(
         'INSERT INTO users (google_id, email, display_name, avatar, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-        [googleId, email, displayName, avatar, 'viewer', 1]
+        [googleId, email, displayName, avatar, 'viewer', true]
       );
       user = await db.getAsync('SELECT * FROM users WHERE google_id = ?', [googleId]);
     } else if (user.avatar !== avatar) {
