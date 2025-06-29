@@ -83,7 +83,7 @@ steps:
         '--allow-unauthenticated',
         '--port', '80',
         '--memory', '256Mi',
-        '--cpu', '0.5',
+        '--cpu', '1',
         '--timeout', '300',
         '--service-account', '1044697249626-compute@developer.gserviceaccount.com'
       ]
