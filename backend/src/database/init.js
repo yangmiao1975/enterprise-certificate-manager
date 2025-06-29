@@ -96,7 +96,7 @@ async function createTables() {
       status TEXT NOT NULL,
       pem_content TEXT,
       folder_id TEXT,
-      uploaded_by TEXT,
+      uploaded_by INTEGER,
       uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       renewal_count INTEGER DEFAULT 0,
