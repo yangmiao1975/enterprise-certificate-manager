@@ -41,8 +41,16 @@ export async function initializeDatabase() {
     
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
+    console.error('📊 Debug info:', {
+      NODE_ENV: process.env.NODE_ENV,
+      DATABASE_PROVIDER: process.env.DATABASE_PROVIDER,
+      CLOUDSQL_HOST: process.env.CLOUDSQL_HOST ? 'SET' : 'MISSING',
+      CLOUDSQL_USERNAME: process.env.CLOUDSQL_USERNAME ? 'SET' : 'MISSING',
+      CLOUDSQL_PASSWORD: process.env.CLOUDSQL_PASSWORD ? 'SET' : 'MISSING',
+      CLOUDSQL_DATABASE: process.env.CLOUDSQL_DATABASE ? 'SET' : 'MISSING'
+    });
     
-    // If Cloud SQL fails, fallback to SQLite for development
+    // Only allow SQLite fallback in development, never in production
     if (process.env.NODE_ENV === 'development' && databaseService?.provider !== 'sqlite') {
       console.log('🔄 Falling back to SQLite for development...');
       
@@ -61,6 +69,8 @@ export async function initializeDatabase() {
       }
     }
     
+    // In production, never fall back to SQLite - force proper Cloud SQL configuration
+    console.error('🚫 Production mode: SQLite fallback disabled. Fix Cloud SQL configuration.');
     throw error;
   }
 }
