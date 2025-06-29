@@ -191,8 +191,19 @@ class RealApiService implements ApiService {
   }
 
   async createFolder(data: any) {
-    const response = await this.client.post('/folders', data);
-    return response.data;
+    try {
+      const response = await this.client.post('/folders', data);
+      return response.data;
+    } catch (error: any) {
+      // Axios error: error.response?.data?.error is backend error code
+      const backendError = error.response?.data;
+      if (backendError && backendError.error) {
+        const err = new Error(backendError.message || 'Failed to create folder.');
+        (err as any).code = backendError.error;
+        throw err;
+      }
+      throw error;
+    }
   }
 
   async updateFolder(id: string, data: any) {

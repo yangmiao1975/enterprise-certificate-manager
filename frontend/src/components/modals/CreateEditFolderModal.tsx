@@ -34,7 +34,11 @@ const CreateEditFolderModal: React.FC<CreateEditFolderModalProps> = ({ isOpen, o
     try {
       await onSave(folderName.trim(), existingFolder?.id);
     } catch (err: any) {
-      setError(err.message || 'Failed to save folder.');
+      if (err.code === 'VIEWER_ROLE') {
+        setError('You are a viewer and do not have permission to create folders.');
+      } else {
+        setError(err.message || 'Failed to save folder.');
+      }
     }
   };
 

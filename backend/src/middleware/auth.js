@@ -117,8 +117,14 @@ export const authMiddleware = async (req, res, next) => {
 
 export const requirePermission = (permission) => {
   return (req, res, next) => {
-    if (!req.user || !Array.isArray(req.user.permissions) || !req.user.permissions.includes(permission)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
+    if (!req.user) {
+      return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authentication required.' });
+    }
+    if (req.user.role === 'viewer') {
+      return res.status(403).json({ error: 'VIEWER_ROLE', message: 'Viewers cannot perform this action.' });
+    }
+    if (!Array.isArray(req.user.permissions) || !req.user.permissions.includes(permission)) {
+      return res.status(403).json({ error: 'INSUFFICIENT_PERMISSIONS', message: 'You do not have permission.' });
     }
     next();
   };
