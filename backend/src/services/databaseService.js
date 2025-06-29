@@ -359,6 +359,7 @@ class DatabaseService {
    */
   getPostgreSQLTableDefinitions() {
     return {
+      // Create tables without foreign keys first
       users: `
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
@@ -397,6 +398,15 @@ class DatabaseService {
         )
       `,
       
+      metadata: `
+        CREATE TABLE IF NOT EXISTS metadata (
+          key VARCHAR(255) PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `,
+      
+      // Create tables with foreign keys last (removed constraints for now to fix syntax error)
       certificates: `
         CREATE TABLE IF NOT EXISTS certificates (
           id VARCHAR(255) PRIMARY KEY,
@@ -413,17 +423,7 @@ class DatabaseService {
           uploaded_by INTEGER,
           uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           is_temp BOOLEAN DEFAULT false,
-          gcp_certificate_name VARCHAR(255),
-          CONSTRAINT fk_certificates_folder FOREIGN KEY (folder_id) REFERENCES folders (id),
-          CONSTRAINT fk_certificates_user FOREIGN KEY (uploaded_by) REFERENCES users (id)
-        )
-      `,
-      
-      metadata: `
-        CREATE TABLE IF NOT EXISTS metadata (
-          key VARCHAR(255) PRIMARY KEY,
-          value TEXT NOT NULL,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          gcp_certificate_name VARCHAR(255)
         )
       `
     };
