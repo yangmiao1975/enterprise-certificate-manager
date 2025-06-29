@@ -298,9 +298,6 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// Named exports for direct imports
-export { PasswordService } from '../services/passwordService.js';
-
 export default {
   initializeDatabase,
   getDatabase,
