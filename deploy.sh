@@ -144,6 +144,13 @@ deploy_docker() {
 deploy_aws_lambda() {
     print_status "Deploying to AWS Lambda (Serverless)..."
     
+    # Set default database configuration for AWS
+    export DB_TYPE=${DB_TYPE:-postgresql}
+    export VAULT_PROVIDER=${VAULT_PROVIDER:-aws-secrets-manager}
+    export CLOUD_PROVIDER=${CLOUD_PROVIDER:-aws}
+    
+    print_status "Database configuration: DB_TYPE=$DB_TYPE, VAULT_PROVIDER=$VAULT_PROVIDER"
+    
     # Check if serverless is installed
     if ! command -v serverless &> /dev/null; then
         print_error "Serverless Framework is not installed. Please install it first:"
@@ -164,6 +171,14 @@ deploy_aws_lambda() {
 deploy_gcp_cloud_run() {
     print_status "Deploying to GCP Cloud Run..."
     
+    # Set default database configuration for GCP
+    export DB_TYPE=${DB_TYPE:-postgresql}
+    export DATABASE_PROVIDER=${DATABASE_PROVIDER:-gcp-cloudsql}
+    export VAULT_PROVIDER=${VAULT_PROVIDER:-gcp-secret-manager}
+    export CLOUD_PROVIDER=${CLOUD_PROVIDER:-gcp}
+    
+    print_status "Database configuration: DB_TYPE=$DB_TYPE, DATABASE_PROVIDER=$DATABASE_PROVIDER, VAULT_PROVIDER=$VAULT_PROVIDER"
+    
     # Check if gcloud is installed
     if ! command -v gcloud &> /dev/null; then
         print_error "Google Cloud SDK is not installed. Please install it first."
@@ -182,6 +197,36 @@ deploy_gcp_cloud_run() {
         print_error "GCP_PROJECT_ID not set and no default project configured."
         print_status "Please set GCP_PROJECT_ID in your .env file or run: gcloud config set project YOUR_PROJECT_ID"
         exit 1
+    fi
+    
+    # Retrieve secrets from Secret Manager
+    print_status "Retrieving secrets from Secret Manager..."
+    if [ -z "$DATABASE_URL" ]; then
+        DATABASE_URL=$(gcloud secrets versions access latest --secret="certificate-manager-database-url" --project="$PROJECT_ID" 2>/dev/null) || {
+            print_warning "certificate-manager-database-url secret not found, using default Cloud SQL connection"
+            CLOUD_SQL_INSTANCE="$PROJECT_ID:us-central1-b:certificate-manager-db"
+            DATABASE_URL="postgresql://cert_manager_app:\${DB_PASSWORD}@/certificate_manager?host=/cloudsql/$CLOUD_SQL_INSTANCE"
+        }
+    fi
+    
+    if [ -z "$DB_PASSWORD" ]; then
+        DB_PASSWORD=$(gcloud secrets versions access latest --secret="certificate-manager-db-password" --project="$PROJECT_ID")
+    fi
+    
+    if [ -z "$JWT_SECRET" ]; then
+        JWT_SECRET=$(gcloud secrets versions access latest --secret="certificate-manager-jwt-secret" --project="$PROJECT_ID")
+    fi
+    
+    # Set CloudSQL specific environment variables for gcp-cloudsql provider
+    if [ "$DATABASE_PROVIDER" = "gcp-cloudsql" ]; then
+        CLOUDSQL_CONNECTION_NAME="$PROJECT_ID:us-central1-b:certificate-manager-db"
+        CLOUDSQL_HOST="35.202.196.139"
+        CLOUDSQL_PORT="5432"
+        CLOUDSQL_USERNAME="cert_manager_app"
+        CLOUDSQL_PASSWORD="$DB_PASSWORD"
+        CLOUDSQL_DATABASE="certificate_manager"
+        
+        print_status "CloudSQL configuration: Using public IP $CLOUDSQL_HOST:$CLOUDSQL_PORT"
     fi
     
     # Enable required APIs
@@ -214,7 +259,8 @@ deploy_gcp_cloud_run() {
         --memory 512Mi \
         --cpu 1 \
         --max-instances 10 \
-        --set-env-vars NODE_ENV=production,GCP_PROJECT_ID=$PROJECT_ID,GCP_LOCATION=${GCP_LOCATION:-us-central1},JWT_SECRET=${JWT_SECRET},DATABASE_URL=${DATABASE_URL}
+        --add-cloudsql-instances $PROJECT_ID:us-central1-b:certificate-manager-db \
+        --set-env-vars NODE_ENV=production,DB_TYPE=$DB_TYPE,DATABASE_PROVIDER=$DATABASE_PROVIDER,CLOUD_PROVIDER=$CLOUD_PROVIDER,VAULT_PROVIDER=$VAULT_PROVIDER,GCP_PROJECT_ID=$PROJECT_ID,GCP_LOCATION=${GCP_LOCATION:-us-central1},JWT_SECRET=${JWT_SECRET},DATABASE_URL=${DATABASE_URL},DB_PASSWORD=${DB_PASSWORD},CLOUDSQL_HOST=${CLOUDSQL_HOST},CLOUDSQL_PORT=${CLOUDSQL_PORT},CLOUDSQL_USERNAME=${CLOUDSQL_USERNAME},CLOUDSQL_PASSWORD=${CLOUDSQL_PASSWORD},CLOUDSQL_DATABASE=${CLOUDSQL_DATABASE}
     
     # Get backend URL
     BACKEND_URL=$(gcloud run services describe certificate-manager-api --platform managed --region ${GCP_LOCATION:-us-central1} --format 'value(status.url)')
@@ -280,6 +326,36 @@ deploy_vm() {
     cd ..
 }
 
+# Function to deploy to Azure Container Instances
+deploy_azure() {
+    print_status "Deploying to Azure Container Instances..."
+    
+    # Set default database configuration for Azure
+    export DB_TYPE=${DB_TYPE:-postgresql}
+    export VAULT_PROVIDER=${VAULT_PROVIDER:-azure-key-vault}
+    export CLOUD_PROVIDER=${CLOUD_PROVIDER:-azure}
+    
+    print_status "Database configuration: DB_TYPE=$DB_TYPE, VAULT_PROVIDER=$VAULT_PROVIDER"
+    
+    # Check if Azure CLI is installed
+    if ! command -v az &> /dev/null; then
+        print_error "Azure CLI is not installed. Please install it first."
+        exit 1
+    fi
+    
+    # Check if logged in to Azure
+    if ! az account show &> /dev/null; then
+        print_error "Not logged in to Azure. Please run 'az login' first."
+        exit 1
+    fi
+    
+    # TODO: Add Azure Container Instances deployment logic
+    print_warning "Azure deployment is not yet implemented. Please refer to Azure documentation."
+    print_status "Recommended approach: Use Azure Container Instances with Azure Database for PostgreSQL"
+    
+    print_success "Azure deployment configuration ready!"
+}
+
 # Function to show logs
 show_logs() {
     print_status "Showing Docker logs..."
@@ -304,11 +380,21 @@ show_help() {
     echo "  docker      Deploy using Docker Compose (recommended)"
     echo "  aws-lambda  Deploy to AWS Lambda using Serverless Framework"
     echo "  gcp-cloud-run Deploy to GCP Cloud Run"
+    echo "  azure       Deploy to Azure Container Instances"
     echo "  vm          Deploy to VM using Terraform"
     echo "  setup       Setup environment and migrate data"
     echo "  logs        Show Docker logs"
     echo "  stop        Stop Docker services"
     echo "  help        Show this help message"
+    echo ""
+    echo "Database Configuration (Environment Variables):"
+    echo "  DB_TYPE           Database type: sqlite, postgresql, mysql, cloud-sql-postgres"
+    echo "  VAULT_PROVIDER    Vault: gcp-secret-manager, aws-secrets-manager, azure-key-vault"
+    echo "  CLOUD_PROVIDER    Cloud: gcp, aws, azure"
+    echo ""
+    echo "Examples with custom database:"
+    echo "  DB_TYPE=mysql ./deploy.sh gcp-cloud-run"
+    echo "  DB_TYPE=postgresql VAULT_PROVIDER=aws-secrets-manager ./deploy.sh aws-lambda"
     echo ""
     echo "Examples:"
     echo "  $0 preview          # Start frontend preview (no backend needed)"
@@ -348,6 +434,12 @@ case "${1:-help}" in
         setup_environment
         migrate_data
         deploy_gcp_cloud_run
+        ;;
+    "azure")
+        check_prerequisites
+        setup_environment
+        migrate_data
+        deploy_azure
         ;;
     "vm")
         check_prerequisites

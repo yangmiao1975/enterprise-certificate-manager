@@ -1,0 +1,145 @@
+{
+  "name": "Enterprise Certificate Manager",
+  "description": "A Venafi-like application to manage enterprise certificates, offering renewal, download, and upload functionalities, enhanced with AI-powered insights and simulated notifications.",
+  "requestFramePermissions": [],
+  "prompt": "",
+  "system": {
+    "tempFolder": {
+      "enabled": true,
+      "path": "./temp_certs",
+      "maxSize": "100MB",
+      "cleanupInterval": 3600000,
+      "retentionDays": 7
+    },
+    "folders": {
+      "defaultFolder": "all-certificates",
+      "systemFolders": [
+        {
+          "id": "all-certificates",
+          "name": "All Certificates",
+          "description": "System folder containing all certificates",
+          "type": "system",
+          "permissions": ["read"],
+          "createdAt": "2024-01-01T00:00:00Z"
+        },
+        {
+          "id": "temp-uploads",
+          "name": "Temporary Uploads",
+          "description": "Temporary storage for uploaded certificates pending review",
+          "type": "system",
+          "permissions": ["read", "write", "delete"],
+          "createdAt": "2024-01-01T00:00:00Z"
+        }
+      ]
+    },
+    "rbac": {
+      "enabled": true,
+      "roles": [
+        {
+          "id": "admin",
+          "name": "Administrator",
+          "description": "Full system access",
+          "permissions": [
+            "certificates:read",
+            "certificates:write",
+            "certificates:delete",
+            "certificates:renew",
+            "folders:read",
+            "folders:write",
+            "folders:delete",
+            "system:settings",
+            "notifications:manage"
+          ]
+        },
+        {
+          "id": "manager",
+          "name": "Certificate Manager",
+          "description": "Can manage certificates and folders",
+          "permissions": [
+            "certificates:read",
+            "certificates:write",
+            "certificates:renew",
+            "folders:read",
+            "folders:write",
+            "notifications:view"
+          ]
+        },
+        {
+          "id": "viewer",
+          "name": "Certificate Viewer",
+          "description": "Read-only access to certificates",
+          "permissions": [
+            "certificates:read",
+            "folders:read"
+          ]
+        },
+        {
+          "id": "uploader",
+          "name": "Certificate Uploader",
+          "description": "Can upload certificates to temp folder",
+          "permissions": [
+            "certificates:read",
+            "certificates:write",
+            "folders:read"
+          ]
+        }
+      ],
+      "users": [
+        {
+          "id": "admin-user",
+          "username": "admin",
+          "email": "admin@example.com",
+          "role": "admin",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00Z"
+        },
+        {
+          "id": "manager-user",
+          "username": "manager",
+          "email": "manager@example.com",
+          "role": "manager",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00Z"
+        },
+        {
+          "id": "viewer-user",
+          "username": "viewer",
+          "email": "viewer@example.com",
+          "role": "viewer",
+          "active": true,
+          "createdAt": "2024-01-01T00:00:00Z"
+        }
+      ]
+    },
+    "folders": {
+      "customFolders": [
+        {
+          "id": "prod-servers",
+          "name": "Production Servers",
+          "description": "Certificates for production servers",
+          "type": "custom",
+          "permissions": ["read", "write"],
+          "createdBy": "admin-user",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "accessControl": {
+            "roles": ["admin", "manager"],
+            "users": ["admin-user", "manager-user"]
+          }
+        },
+        {
+          "id": "internal-tools",
+          "name": "Internal Tools",
+          "description": "Certificates for internal development tools",
+          "type": "custom",
+          "permissions": ["read", "write"],
+          "createdBy": "admin-user",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "accessControl": {
+            "roles": ["admin", "manager", "viewer"],
+            "users": ["admin-user", "manager-user", "viewer-user"]
+          }
+        }
+      ]
+    }
+  }
+}

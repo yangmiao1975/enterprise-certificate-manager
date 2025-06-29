@@ -4,7 +4,6 @@
  * Provides unified interface with automatic failover and connection pooling
  */
 
-import sqlite3 from 'sqlite3';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -73,15 +72,21 @@ class DatabaseService {
    * @param {Object} config - SQLite configuration
    */
   async initializeSQLite(config) {
-    const dbPath = config.database;
-    
-    // Ensure data directory exists
-    const dataDir = dirname(dbPath);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
+    try {
+      const sqlite3 = (await import('sqlite3')).default;
+      
+      const dbPath = config.database;
+      
+      // Ensure data directory exists
+      const dataDir = dirname(dbPath);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
 
-    this.connection = new sqlite3.Database(dbPath);
+      this.connection = new sqlite3.Database(dbPath);
+    } catch (error) {
+      throw new Error('SQLite support requires "sqlite3" package. Install with: npm install sqlite3');
+    }
     
     // Add promisified helpers first
     this.connection.getAsync = promisify(this.connection.get).bind(this.connection);

@@ -1,5 +1,3 @@
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
 const { promisify } = require('util');
 
 class DatabaseConfig {
@@ -46,17 +44,24 @@ class DatabaseConfig {
   }
 
   async createSQLiteConnection() {
-    const db = await open({
-      filename: this.config.filename,
-      driver: sqlite3.Database
-    });
+    try {
+      const sqlite3 = require('sqlite3').verbose();
+      const { open } = require('sqlite');
+      
+      const db = await open({
+        filename: this.config.filename,
+        driver: sqlite3.Database
+      });
 
-    // Add async wrapper methods
-    db.runAsync = promisify(db.run.bind(db));
-    db.getAsync = promisify(db.get.bind(db));
-    db.allAsync = promisify(db.all.bind(db));
+      // Add async wrapper methods
+      db.runAsync = promisify(db.run.bind(db));
+      db.getAsync = promisify(db.get.bind(db));
+      db.allAsync = promisify(db.all.bind(db));
 
-    return db;
+      return db;
+    } catch (error) {
+      throw new Error('SQLite support requires "sqlite3" package. Install with: npm install sqlite3');
+    }
   }
 
   async createPostgreSQLConnection() {

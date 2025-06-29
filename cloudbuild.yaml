@@ -37,7 +37,7 @@ steps:
       - |
         cd frontend
         npm ci
-        VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app \
+        VITE_API_URL=https://certificate-manager-api-zvamulkqqq-uc.a.run.app \
         VITE_ENVIRONMENT=gcp-cloud-run \
         VITE_GEMINI_API_KEY="$(cat ../gemini_api_key.txt)" \
         npm run build

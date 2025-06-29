@@ -1,0 +1,46 @@
+// Add this enhanced error handling to your frontend upload code
+// In services/apiService.ts, update the uploadCertificate method:
+
+async uploadCertificate(file: File, folderId?: string) {
+  console.log('🚀 Starting certificate upload...');
+  console.log('📄 File:', file.name, 'Size:', file.size, 'Type:', file.type);
+  console.log('📁 Folder ID:', folderId);
+  
+  const formData = new FormData();
+  formData.append('certificate', file);
+  if (folderId) {
+    formData.append('folderId', folderId);
+  }
+
+  console.log('📦 FormData created');
+  
+  try {
+    const response = await this.client.post('/certificates', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 120000,
+      // Add response interceptor to log full error
+      validateStatus: () => true // Don't throw on 4xx/5xx
+    });
+    
+    console.log('📊 Response status:', response.status);
+    console.log('📊 Response headers:', response.headers);
+    console.log('📊 Response data:', response.data);
+    
+    if (response.status >= 400) {
+      throw new Error(`Upload failed: ${response.status} - ${JSON.stringify(response.data)}`);
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('💥 Upload error details:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers
+    });
+    throw error;
+  }
+}
