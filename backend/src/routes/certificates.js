@@ -94,14 +94,35 @@ router.get('/:id', async (req, res, next) => {
 
 // Upload certificate
 router.post('/', upload.single('certificate'), validateCertificateUpload, async (req, res, next) => {
+  console.log('=== CERTIFICATE UPLOAD DEBUG ===');
+  console.log('Request headers authorization:', req.headers.authorization ? 'Present' : 'Missing');
+  console.log('Request user:', req.user ? { id: req.user.id, username: req.user.username } : 'No user');
+  console.log('Request body:', req.body);
+  console.log('Request file:', req.file ? {
+    originalname: req.file.originalname,
+    size: req.file.size,
+    mimetype: req.file.mimetype,
+    hasBuffer: !!req.file.buffer
+  } : 'No file');
+  
   try {
     const db = getDatabase();
     const { folderId } = req.body || {};
     const file = req.file;
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    
+    console.log('Extracted values:', { folderId, userId, hasFile: !!file });
 
     if (!file) {
+      console.log('UPLOAD FAIL: No file provided');
+      console.log('=== END CERTIFICATE UPLOAD DEBUG ===');
       return res.status(400).json({ error: 'Certificate file is required' });
+    }
+    
+    if (!userId) {
+      console.log('UPLOAD FAIL: No user ID (authentication failed)');
+      console.log('=== END CERTIFICATE UPLOAD DEBUG ===');
+      return res.status(401).json({ error: 'User authentication required' });
     }
 
     // Parse certificate (pass buffer and originalname)

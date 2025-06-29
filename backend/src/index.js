@@ -93,6 +93,16 @@ async function startServer() {
     
     console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
     
+    // Environment variable checks for debugging
+    console.log('=== ENVIRONMENT VARIABLE CHECK ===');
+    console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'SET (length: ' + process.env.JWT_SECRET.length + ')' : 'MISSING');
+    console.log('GCP_PROJECT_ID:', process.env.GCP_PROJECT_ID ? 'SET' : 'MISSING');
+    console.log('DATABASE_TYPE:', process.env.DATABASE_TYPE || 'NOT SET');
+    console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'MISSING');
+    console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+    console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN || 'NOT SET');
+    console.log('=== END ENVIRONMENT CHECK ===');
+    
     // Startup check for GOOGLE_CALLBACK_URL
     if (!process.env.GOOGLE_CALLBACK_URL) {
       console.error('ERROR: GOOGLE_CALLBACK_URL is not set!');

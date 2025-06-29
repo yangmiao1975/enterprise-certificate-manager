@@ -27,12 +27,12 @@ export async function initializeDatabase() {
     // Initialize password service
     passwordService = new PasswordService();
     
-    // Run AI provider migration
+    // Run all database migrations
     try {
-      const { runAIProviderMigration } = await import('./runMigration.js');
-      await runAIProviderMigration();
+      const { runAllMigrations } = await import('./migrationRunner.js');
+      await runAllMigrations();
     } catch (migrationError) {
-      console.warn('⚠️ AI provider migration skipped:', migrationError.message);
+      console.warn('⚠️ Database migrations skipped:', migrationError.message);
     }
     
     console.log(`✅ Database system initialized: ${databaseService.provider.toUpperCase()}`);
@@ -85,6 +85,18 @@ export function getDatabase() {
   }
   
   return databaseService.getConnection();
+}
+
+/**
+ * Get database provider type
+ * @returns {string} Database provider (sqlite, postgresql, gcp-cloudsql, etc.)
+ */
+export function getDatabaseProvider() {
+  if (!databaseService) {
+    throw new Error('Database not initialized. Call initializeDatabase() first.');
+  }
+  
+  return databaseService.provider;
 }
 
 /**
