@@ -204,7 +204,7 @@ deploy_gcp_cloud_run() {
     if [ -z "$DATABASE_URL" ]; then
         DATABASE_URL=$(gcloud secrets versions access latest --secret="certificate-manager-database-url" --project="$PROJECT_ID" 2>/dev/null) || {
             print_warning "certificate-manager-database-url secret not found, using default Cloud SQL connection"
-            CLOUD_SQL_INSTANCE="$PROJECT_ID:us-central1-b:certificate-manager-db"
+            CLOUD_SQL_INSTANCE="$PROJECT_ID:us-central1:certificate-manager-db"
             DATABASE_URL="postgresql://cert_manager_app:\${DB_PASSWORD}@/certificate_manager?host=/cloudsql/$CLOUD_SQL_INSTANCE"
         }
     fi
@@ -219,7 +219,7 @@ deploy_gcp_cloud_run() {
     
     # Set CloudSQL specific environment variables for gcp-cloudsql provider
     if [ "$DATABASE_PROVIDER" = "gcp-cloudsql" ]; then
-        CLOUDSQL_CONNECTION_NAME="$PROJECT_ID:us-central1-b:certificate-manager-db"
+        CLOUDSQL_CONNECTION_NAME="$PROJECT_ID:us-central1:certificate-manager-db"
         CLOUDSQL_HOST="35.202.196.139"
         CLOUDSQL_PORT="5432"
         CLOUDSQL_USERNAME="cert_manager_app"

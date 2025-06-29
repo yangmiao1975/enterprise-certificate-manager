@@ -66,7 +66,7 @@ router.post('/', requirePermission('system:settings'), async (req, res, next) =>
     // Create user (let SQLite auto-generate the ID)
     const result = await db.runAsync(
       'INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)',
-      [username, email, passwordHash, role || 'viewer', true]
+      [username, email, passwordHash, role || 'viewer', 1]
     );
 
     const newUser = await db.getAsync(`

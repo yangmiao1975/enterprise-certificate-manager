@@ -38,7 +38,11 @@ const PORT = process.env.PORT || 8080;
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'https://certificate-manager-frontend-1044697249626.us-central1.run.app',
+    process.env.CORS_ORIGIN
+  ].filter(Boolean),
   credentials: true
 }));
 
@@ -95,7 +99,17 @@ async function startServer() {
     });
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    
+    // In production, try to start server anyway for debugging
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🚨 Starting server despite database error for debugging...');
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} (DATABASE ERROR MODE)`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    } else {
+      process.exit(1);
+    }
   }
 }
 

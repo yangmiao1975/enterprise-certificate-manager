@@ -16,7 +16,7 @@ export const authMiddleware = async (req, res, next) => {
     const db = getDatabase();
     const allUsers = await db.allAsync('SELECT id, email, active FROM users');
     // console.log('All users in DB:', allUsers);
-    const user = await db.getAsync('SELECT * FROM users WHERE id = ? AND active = ?', [decoded.id, true]);
+    const user = await db.getAsync('SELECT * FROM users WHERE id = ? AND active = ?', [decoded.id, 1]);
     // console.log('User from DB:', user);
     
     if (!user) {

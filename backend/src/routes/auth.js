@@ -34,7 +34,7 @@ passport.use(new GoogleStrategy({
       // Create new user
       await db.runAsync(
         'INSERT INTO users (google_id, email, display_name, avatar, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-        [googleId, email, displayName, avatar, 'viewer', true]
+        [googleId, email, displayName, avatar, 'viewer', 1]
       );
       user = await db.getAsync('SELECT * FROM users WHERE google_id = ?', [googleId]);
     } else if (user.avatar !== avatar) {
@@ -79,7 +79,7 @@ router.post('/login', validateLogin, async (req, res, next) => {
     const { username, password } = req.body;
     const db = getDatabase();
 
-    const user = await db.getAsync('SELECT * FROM users WHERE username = ? AND active = ?', [username, true]);
+    const user = await db.getAsync('SELECT * FROM users WHERE username = ? AND active = ?', [username, 1]);
     // console.log('Login attempt:', { username });
     // console.log('User from DB:', user);
     // if (user) {

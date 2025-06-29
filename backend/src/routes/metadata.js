@@ -72,7 +72,7 @@ router.get('/stats', async (req, res, next) => {
         (SELECT COUNT(*) FROM folders WHERE type = 'system') as system_folders,
         (SELECT COUNT(*) FROM users WHERE active = ?) as active_users,
         (SELECT COUNT(*) FROM users WHERE active = ?) as inactive_users
-    `, [true, false]);
+    `, [1, 0]);
 
     // Get certificates by status for chart
     const statusBreakdown = await db.allAsync(`

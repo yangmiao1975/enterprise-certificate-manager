@@ -140,11 +140,30 @@ JWT_SECRET=stored-in-secret-manager
 ### Frontend Environment (GCP Cloud Run)
 ```bash
 # Frontend specific for GCP Cloud Run
-VITE_API_URL=https://api-cloud-run-url
+VITE_API_URL=https://certificate-manager-api-1044697249626.us-central1.run.app
 VITE_CLOUD_PROVIDER=gcp
 VITE_ENVIRONMENT=gcp-cloud-run
 VITE_FEATURES=gcp-integration
 ```
+
+## Security Configuration
+
+### Environment Variables Setup
+1. **Copy example files**:
+   ```bash
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env.local
+   ```
+2. **Update with your actual credentials** (never commit these files)
+3. **Required secrets**:
+   - Google OAuth Client ID and Secret
+   - JWT Secret
+   - Gemini API Key (if using AI features)
+
+### Important Security Notes
+- ✅ **DO COMMIT**: `.env.example` files with placeholder values
+- ❌ **NEVER COMMIT**: `.env` files with real secrets
+- ✅ **Git ignores**: All `.env` files are excluded via `.gitignore`
 
 ### Future Multi-Cloud Environment Variables
 ```bash

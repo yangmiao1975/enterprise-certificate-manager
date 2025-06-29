@@ -195,9 +195,15 @@ class DatabaseService {
     } catch (error) {
       console.error('PostgreSQL connection failed:', error);
       
-      // Fallback to SQLite if PostgreSQL fails
+      // In production, don't fallback to SQLite - throw the error instead
+      if (process.env.NODE_ENV === 'production') {
+        console.error('🚫 Production mode: PostgreSQL connection failed. No SQLite fallback in production.');
+        throw error;
+      }
+      
+      // Fallback to SQLite only in development
       if (this.provider !== 'sqlite') {
-        console.log('⚠️  Falling back to SQLite...');
+        console.log('⚠️  Development mode: Falling back to SQLite...');
         this.provider = 'sqlite';
         this.config.switchProvider('sqlite');
         await this.initializeSQLite(this.config.getCurrentConfig());
@@ -225,14 +231,13 @@ class DatabaseService {
       // Convert IF NOT EXISTS for CREATE TRIGGER (PostgreSQL doesn't support it)
       .replace(/CREATE TRIGGER IF NOT EXISTS/gi, 'CREATE OR REPLACE FUNCTION')
       // Convert SQLite parameter placeholders ? to PostgreSQL $1, $2, etc.
-      .replace(/\?/g, (match, offset, string) => {
-        const beforeMatch = string.substring(0, offset);
-        const paramCount = (beforeMatch.match(/\$/g) || []).length + 1;
-        return `$${paramCount}`;
-      })
-      // Convert AND active = 1 to AND active = true
-      .replace(/active\s*=\s*1/gi, 'active = true')
-      .replace(/active\s*=\s*0/gi, 'active = false')
+      .replace(/\?/g, (() => {
+        let paramCount = 0;
+        return () => `$${++paramCount}`;
+      })())
+      // Keep active comparisons as integers for PostgreSQL compatibility
+      // .replace(/active\s*=\s*1/gi, 'active = true')
+      // .replace(/active\s*=\s*0/gi, 'active = false')
       // Handle CURRENT_TIMESTAMP
       .replace(/DEFAULT CURRENT_TIMESTAMP/gi, 'DEFAULT CURRENT_TIMESTAMP');
 
@@ -260,9 +265,9 @@ class DatabaseService {
    */
   convertParametersForPostgreSQL(params) {
     return params.map(param => {
-      // Convert SQLite boolean numbers to PostgreSQL booleans
-      if (param === 1) return true;
-      if (param === 0) return false;
+      // Keep integers as integers for PostgreSQL compatibility
+      // if (param === 1) return true;
+      // if (param === 0) return false;
       
       // Don't convert string numbers - they might be legitimate strings
       // Only convert actual number literals
@@ -327,8 +332,67 @@ class DatabaseService {
       }
     }
 
+    // Run schema migrations for existing tables
+    await this.runSchemaMigrations();
+
     // Create indexes
     await this.createIndexes();
+  }
+
+  /**
+   * Run schema migrations for existing PostgreSQL tables
+   */
+  async runSchemaMigrations() {
+    try {
+      // DEBUG PHASE: Clean slate approach - recreate folders table with correct structure
+      console.log('  🧹 DEBUG: Recreating folders table with clean data...');
+      
+      await this.connection.execAsync(`DROP TABLE IF EXISTS folders CASCADE`);
+      
+      await this.connection.execAsync(`
+        CREATE TABLE folders (
+          id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          type VARCHAR(50) NOT NULL,
+          permissions TEXT NOT NULL,
+          created_by INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          access_control TEXT,
+          parent_id VARCHAR(255)
+        )
+      `);
+      
+      // Insert default folders with proper integer created_by values
+      await this.connection.execAsync(`
+        INSERT INTO folders (id, name, description, type, permissions, created_by, access_control) VALUES
+        ('all-certificates', 'All Certificates', 'System folder containing all certificates', 'system', '["read"]', 1, NULL),
+        ('temp-uploads', 'Temporary Uploads', 'Temporary storage for uploaded certificates pending review', 'system', '["read", "write", "delete"]', 1, NULL),
+        ('prod-servers', 'Production Servers', 'Certificates for production servers', 'custom', '["read", "write"]', 1, '{"roles": ["admin", "manager"], "users": ["admin-user"]}')
+      `);
+      
+      console.log('  ✅ DEBUG: Folders table recreated successfully with clean integer data');
+    } catch (error) {
+      console.log(`  ⚠️ DEBUG: Folders table recreation failed: ${error.message}`);
+      
+      // Fallback: Try to fix existing data
+      try {
+        console.log('  🔄 Fallback: Attempting to fix existing data...');
+        await this.connection.execAsync(`
+          UPDATE folders SET created_by = 1 
+          WHERE created_by IS NULL OR created_by::text ~ '^[a-zA-Z]' OR created_by = 'admin-user' OR created_by = 'admin'
+        `);
+        
+        await this.connection.execAsync(`
+          ALTER TABLE folders 
+          ADD COLUMN IF NOT EXISTS parent_id VARCHAR(255)
+        `);
+        
+        console.log('  ✅ Fallback: Fixed existing folders data');
+      } catch (fallbackError) {
+        console.log(`  ❌ Fallback failed: ${fallbackError.message}`);
+      }
+    }
   }
 
   /**
@@ -446,9 +510,10 @@ class DatabaseService {
           description TEXT,
           type VARCHAR(50) NOT NULL,
           permissions TEXT NOT NULL,
-          created_by VARCHAR(255),
+          created_by INTEGER,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          access_control TEXT
+          access_control TEXT,
+          parent_id VARCHAR(255)
         )
       `,
       
@@ -598,7 +663,7 @@ class DatabaseService {
         description: 'System folder containing all certificates',
         type: 'system',
         permissions: JSON.stringify(['read']),
-        created_by: 'admin-user'
+        created_by: 1
       },
       {
         id: 'temp-uploads',
@@ -606,7 +671,7 @@ class DatabaseService {
         description: 'Temporary storage for uploaded certificates pending review',
         type: 'system',
         permissions: JSON.stringify(['read', 'write', 'delete']),
-        created_by: 'admin-user'
+        created_by: 1
       },
       {
         id: 'prod-servers',
@@ -614,7 +679,7 @@ class DatabaseService {
         description: 'Certificates for production servers',
         type: 'custom',
         permissions: JSON.stringify(['read', 'write']),
-        created_by: 'admin-user',
+        created_by: 1,
         access_control: JSON.stringify({
           roles: ['admin', 'manager'],
           users: ['admin-user']

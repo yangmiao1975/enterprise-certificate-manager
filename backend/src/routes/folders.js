@@ -17,7 +17,7 @@ router.get('/', async (req, res, next) => {
              (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
              pf.name as parent_name
       FROM folders f
-      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN users u ON f.created_by::INTEGER = u.id
       LEFT JOIN folders pf ON f.parent_id = pf.id
       WHERE 1=1
     `;
@@ -48,7 +48,7 @@ router.get('/:id', validateId, async (req, res, next) => {
              (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
              pf.name as parent_name
       FROM folders f
-      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN users u ON f.created_by::INTEGER = u.id
       LEFT JOIN folders pf ON f.parent_id = pf.id
       WHERE f.id = ?
     `, [id]);
@@ -117,7 +117,7 @@ router.post('/', validateFolder, requirePermission('folders:write'), async (req,
     const folder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username
       FROM folders f
-      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN users u ON f.created_by::INTEGER = u.id
       WHERE f.id = ?
     `, [folderId]);
 
@@ -163,7 +163,7 @@ router.put('/:id', validateId, validateFolder, requirePermission('folders:write'
     const updatedFolder = await db.getAsync(`
       SELECT f.*, u.username as created_by_username
       FROM folders f
-      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN users u ON f.created_by::INTEGER = u.id
       WHERE f.id = ?
     `, [id]);
 
@@ -299,7 +299,7 @@ router.patch('/:id/move', validateId, requirePermission('folders:write'), async 
              (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
              pf.name as parent_name
       FROM folders f
-      LEFT JOIN users u ON f.created_by = u.id
+      LEFT JOIN users u ON f.created_by::INTEGER = u.id
       LEFT JOIN folders pf ON f.parent_id = pf.id
       WHERE f.id = ?
     `, [id]);
