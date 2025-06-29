@@ -40,11 +40,9 @@ class DatabaseConfig {
         password: process.env.CLOUDSQL_PASSWORD || process.env.DB_PASS,
         database: process.env.CLOUDSQL_DATABASE || process.env.DB_NAME || 'certificate_manager',
         
-        // High Availability Configuration
-        ssl: {
-          rejectUnauthorized: false,
-          // Will use Cloud SQL Auth Proxy for secure connections
-        },
+        // Cloud SQL SSL Configuration 
+        // When using Cloud SQL Auth Proxy (Unix socket), SSL is handled by the proxy
+        ssl: false,
         
         // Connection Pooling for Enterprise Scale
         extra: {
