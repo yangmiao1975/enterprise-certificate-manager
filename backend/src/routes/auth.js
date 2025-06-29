@@ -79,7 +79,7 @@ router.post('/login', validateLogin, async (req, res, next) => {
     const { username, password } = req.body;
     const db = getDatabase();
 
-    const user = await db.getAsync('SELECT * FROM users WHERE username = ? AND active = 1', [username]);
+    const user = await db.getAsync('SELECT * FROM users WHERE username = ? AND active = ?', [username, true]);
     // console.log('Login attempt:', { username });
     // console.log('User from DB:', user);
     // if (user) {

@@ -70,9 +70,9 @@ router.get('/stats', async (req, res, next) => {
         (SELECT COUNT(*) FROM certificates WHERE status = 'EXPIRING_SOON') as expiring_soon_certificates,
         (SELECT COUNT(*) FROM folders WHERE type = 'custom') as custom_folders,
         (SELECT COUNT(*) FROM folders WHERE type = 'system') as system_folders,
-        (SELECT COUNT(*) FROM users WHERE active = 1) as active_users,
-        (SELECT COUNT(*) FROM users WHERE active = 0) as inactive_users
-    `);
+        (SELECT COUNT(*) FROM users WHERE active = ?) as active_users,
+        (SELECT COUNT(*) FROM users WHERE active = ?) as inactive_users
+    `, [true, false]);
 
     // Get certificates by status for chart
     const statusBreakdown = await db.allAsync(`

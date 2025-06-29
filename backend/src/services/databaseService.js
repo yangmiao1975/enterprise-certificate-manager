@@ -261,8 +261,11 @@ class DatabaseService {
   convertParametersForPostgreSQL(params) {
     return params.map(param => {
       // Convert SQLite boolean numbers to PostgreSQL booleans
-      if (param === 1 || param === '1') return true;
-      if (param === 0 || param === '0') return false;
+      if (param === 1) return true;
+      if (param === 0) return false;
+      
+      // Don't convert string numbers - they might be legitimate strings
+      // Only convert actual number literals
       
       // Ensure null values are properly handled
       if (param === undefined) return null;
