@@ -299,8 +299,212 @@ router.post('/parse-certificate', async (req, res) => {
 });
 
 /**
+ * GET /api/ai/settings
+ * Get user's AI settings
+ */
+router.get('/settings', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user configuration
+    const userConfig = await aiRouter.getUserAIConfig(userId);
+    
+    // Get user's configured providers with their API keys
+    const db = getDatabase();
+    const providers = await db.allAsync(
+      'SELECT provider, api_key_encrypted, created_at FROM user_ai_providers WHERE user_id = ?',
+      [userId]
+    );
+
+    // Decrypt API keys for display (masked)
+    const providerConfigs = providers.map(p => ({
+      provider: p.provider,
+      apiKey: p.api_key_encrypted ? '***encrypted***' : '',
+      isActive: true,
+      addedAt: p.created_at
+    }));
+
+    res.json({
+      primaryProvider: userConfig.primaryProvider,
+      fallbackProvider: userConfig.fallbackProvider,
+      usePersonalKeys: userConfig.usePersonalKeys,
+      providers: providerConfigs
+    });
+  } catch (error) {
+    console.error('Error in /ai/settings:', error);
+    res.status(500).json({
+      error: 'Failed to load AI settings'
+    });
+  }
+});
+
+/**
+ * PUT /api/ai/settings
+ * Update user's AI settings
+ */
+router.put('/settings', async (req, res) => {
+  try {
+    const { primaryProvider, fallbackProvider, usePersonalKeys } = req.body;
+    const userId = req.user.id;
+
+    const db = getDatabase();
+    await db.runAsync(`
+      INSERT OR REPLACE INTO user_ai_settings 
+      (user_id, primary_provider, fallback_provider, use_personal_keys, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `, [userId, primaryProvider, fallbackProvider, usePersonalKeys ? 1 : 0]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in /ai/settings PUT:', error);
+    res.status(500).json({
+      error: 'Failed to update AI settings'
+    });
+  }
+});
+
+/**
+ * POST /api/ai/providers
+ * Add or update an AI provider
+ */
+router.post('/providers', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body;
+    const userId = req.user.id;
+
+    if (!provider || !apiKey) {
+      return res.status(400).json({
+        error: 'Provider and API key are required'
+      });
+    }
+
+    // Encrypt API key
+    const encryptionKey = process.env.AI_KEY_ENCRYPTION_SECRET || 'default-key-change-in-production';
+    const cipher = crypto.createCipher('aes192', encryptionKey);
+    let encrypted = cipher.update(apiKey, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    const db = getDatabase();
+    await db.runAsync(`
+      INSERT OR REPLACE INTO user_ai_providers 
+      (user_id, provider, api_key_encrypted, created_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `, [userId, provider, encrypted]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in /ai/providers POST:', error);
+    res.status(500).json({
+      error: 'Failed to add AI provider'
+    });
+  }
+});
+
+/**
+ * DELETE /api/ai/providers/:provider
+ * Remove an AI provider
+ */
+router.delete('/providers/:provider', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const userId = req.user.id;
+
+    const db = getDatabase();
+    await db.runAsync(
+      'DELETE FROM user_ai_providers WHERE user_id = ? AND provider = ?',
+      [userId, provider]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in /ai/providers DELETE:', error);
+    res.status(500).json({
+      error: 'Failed to remove AI provider'
+    });
+  }
+});
+
+/**
+ * POST /api/ai/test
+ * Test an AI provider connection
+ */
+router.post('/test', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body;
+    const userId = req.user.id;
+
+    if (!provider) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provider is required'
+      });
+    }
+
+    // Test with provided API key or user's stored key
+    let testApiKey = apiKey;
+    if (!testApiKey) {
+      testApiKey = await aiRouter.getUserApiKey(userId, provider);
+    }
+
+    if (!testApiKey) {
+      return res.json({
+        success: false,
+        message: 'No API key available for testing'
+      });
+    }
+
+    // Create provider instance and test
+    const providerInstance = aiRouter.createProvider(provider, testApiKey);
+    
+    // Simple test with a basic prompt
+    const testResult = await providerInstance.generateChatResponse(
+      [{ role: 'user', content: 'Say "test successful" if you can read this.' }],
+      'You are a helpful assistant. Respond briefly.',
+      { temperature: 0.1 }
+    );
+
+    if (testResult && testResult.content) {
+      res.json({
+        success: true,
+        message: 'Connection test successful'
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Provider responded but test failed'
+      });
+    }
+  } catch (error) {
+    console.error('Error in /ai/test:', error);
+    res.json({
+      success: false,
+      message: `Test failed: ${error.message}`
+    });
+  }
+});
+
+/**
+ * GET /api/ai/providers/available
+ * Get available system providers
+ */
+router.get('/providers/available', async (req, res) => {
+  try {
+    const availableProviders = aiRouter.getAvailableProviders();
+    
+    res.json({
+      system: availableProviders.system.map(p => p.provider)
+    });
+  } catch (error) {
+    console.error('Error in /ai/providers/available:', error);
+    res.status(500).json({
+      error: 'Failed to get available providers'
+    });
+  }
+});
+
+/**
  * GET /api/ai/providers
- * Get available AI providers and user configuration
+ * Get available AI providers and user configuration (legacy endpoint)
  */
 router.get('/providers', async (req, res) => {
   try {

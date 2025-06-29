@@ -29,6 +29,9 @@ npm run dev           # Start with nodemon (development)
 npm start             # Start production server (port 8080)
 npm test              # Run Jest tests
 npm run build:docker  # Build for Docker deployment
+
+# Database migrations (automatic on startup)
+node src/database/migrationRunner.js  # Run migrations manually if needed
 ```
 
 ### GCP Cloud Run Deployment (Primary)
@@ -218,6 +221,8 @@ backend/src/services/
 ```
 
 ## Database Schema (GCP Cloud SQL)
+
+**Automatic Migration System**: All database schema changes are applied automatically on startup via the migration system in `backend/src/database/migrationRunner.js`.
 
 Optimized for Cloud SQL PostgreSQL:
 ```sql

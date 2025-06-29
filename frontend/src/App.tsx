@@ -8,6 +8,7 @@ import Modal from './components/Modal';
 import UploadCertificateForm from './components/UploadCertificateForm';
 import ViewCertificateDataModal from './components/ViewCertificateDataModal';
 import NotificationSettingsModal from './components/NotificationSettingsModal';
+import { AISettingsModal } from './components/AISettingsModal';
 import FolderPanel from './components/FolderPanel';
 import CreateEditFolderModal from './components/modals/CreateEditFolderModal';
 import AssignCertificateFolderModal from './components/modals/AssignCertificateFolderModal';
@@ -36,6 +37,7 @@ import { apiService } from './services/apiService';
 import { loadNotificationSettings, saveNotificationSettings } from './services/notificationSettingsService';
 import { initializeAuth, getCurrentUser } from './services/authService';
 import { loadMetadata, getDefaultFolder } from './services/metadataService';
+import { notificationService } from './services/notificationService';
 import { ICONS, DEFAULT_NOTIFICATION_SETTINGS, ALL_CERTIFICATES_FOLDER_ID } from './constants';
 
 const isAuthenticated = () => !!localStorage.getItem('authToken');
@@ -74,6 +76,7 @@ const MainApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isGeminiChatOpen, setIsGeminiChatOpen] = useState<boolean>(false);
   const [selectedCertificateForChat, setSelectedCertificateForChat] = useState<string | undefined>(undefined);
+  const [isAISettingsModalOpen, setIsAISettingsModalOpen] = useState<boolean>(false);
 
   const addNotification = useCallback((message: string, type: NotificationMessage['type']) => {
     const newNotification: NotificationMessage = {
@@ -84,6 +87,11 @@ const MainApp: React.FC = () => {
     };
     setNotifications(prev => [newNotification, ...prev.slice(0, 4)]);
   }, []);
+
+  // Initialize notification service
+  React.useEffect(() => {
+    notificationService.setAddNotificationCallback(addNotification);
+  }, [addNotification]);
 
   const dismissNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -564,6 +572,7 @@ Enterprise Certificate Manager (Simulated Email System)`;
         onSettingsClick={() => setIsNotificationSettingsModalOpen(true)} 
         onUserChange={handleUserChange}
         onGeminiChatClick={() => setIsGeminiChatOpen(true)}
+        onAISettingsClick={() => setIsAISettingsModalOpen(true)}
       />
       <NotificationArea notifications={notifications} onDismissNotification={dismissNotification} />
       
@@ -704,6 +713,12 @@ Enterprise Certificate Manager (Simulated Email System)`;
           setSelectedCertificateForChat(undefined);
         }}
         selectedCertificateId={selectedCertificateForChat}
+      />
+
+      {/* AI Settings Modal */}
+      <AISettingsModal
+        isOpen={isAISettingsModalOpen}
+        onClose={() => setIsAISettingsModalOpen(false)}
       />
     </div>
   );

@@ -8,11 +8,12 @@ interface HeaderProps {
   onSettingsClick: () => void;
   onUserChange?: () => void;
   onGeminiChatClick?: () => void;
+  onAISettingsClick?: () => void;
 }
 
 const isAuthenticated = !!localStorage.getItem('token');
 
-const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserChange, onGeminiChatClick }) => {
+const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserChange, onGeminiChatClick, onAISettingsClick }) => {
   return (
     <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
       <div className="container mx-auto px-4 md:px-6 lg:px-8">
@@ -45,6 +46,18 @@ const Header: React.FC<HeaderProps> = ({ onUploadClick, onSettingsClick, onUserC
                 title="AI Assistant"
               >
                 AI Chat
+              </button>
+            )}
+            
+            {onAISettingsClick && (
+              <button
+                onClick={onAISettingsClick}
+                className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+                title="AI Settings"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
               </button>
             )}
             

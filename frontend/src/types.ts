@@ -95,6 +95,37 @@ export interface NotificationMessage {
   timestamp: number;
 }
 
+// AI Configuration Types
+export enum AIProvider {
+  OPENAI = 'openai',
+  CLAUDE = 'claude',
+  GEMINI = 'gemini',
+  GROK = 'grok',
+  DEEPSEEK = 'deepseek'
+}
+
+export interface AIProviderConfig {
+  provider: AIProvider;
+  apiKey: string;
+  isActive: boolean;
+  addedAt: string;
+}
+
+export interface AIUserSettings {
+  primaryProvider: AIProvider | null;
+  fallbackProvider: AIProvider | null;
+  usePersonalKeys: boolean;
+  providers: AIProviderConfig[];
+}
+
+export interface AIProviderInfo {
+  name: string;
+  description: string;
+  website: string;
+  keyFormat: string;
+  keyExample: string;
+}
+
 export interface AIChatMessage {
   role: 'user' | 'model';
   text: string;

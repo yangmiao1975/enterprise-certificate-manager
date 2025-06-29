@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { getDatabaseHealth, config, migration } from '../database/flexible-init.js';
+import { getDatabaseHealth, migration } from '../database/flexible-init.js';
 
 const router = express.Router();
 
