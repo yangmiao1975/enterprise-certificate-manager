@@ -93,6 +93,15 @@ async function startServer() {
     
     console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
     
+    // Startup check for GOOGLE_CALLBACK_URL
+    if (!process.env.GOOGLE_CALLBACK_URL) {
+      console.error('ERROR: GOOGLE_CALLBACK_URL is not set!');
+      process.exit(1);
+    }
+    if (!process.env.GOOGLE_CALLBACK_URL.includes('/api/auth/google/callback')) {
+      console.warn('WARNING: GOOGLE_CALLBACK_URL may be incorrect:', process.env.GOOGLE_CALLBACK_URL);
+    }
+    
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

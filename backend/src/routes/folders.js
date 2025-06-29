@@ -11,14 +11,21 @@ router.get('/', async (req, res, next) => {
   try {
     const db = getDatabase();
     const { type } = req.query;
+    const dbProvider = process.env.DATABASE_PROVIDER || 'sqlite';
+    
+    // Use type casting for Postgres, not for SQLite
+    const joinCreatedBy = dbProvider === 'gcp-cloudsql' || dbProvider === 'postgres'
+      ? 'LEFT JOIN users u ON f.created_by::INTEGER = u.id'
+      : 'LEFT JOIN users u ON f.created_by = u.id';
+    const joinParentFolder = 'LEFT JOIN folders pf ON f.parent_id = pf.id';
     
     let query = `
       SELECT f.*, u.username as created_by_username,
              (SELECT COUNT(*) FROM certificates WHERE folder_id = f.id) as certificate_count,
              pf.name as parent_name
       FROM folders f
-      LEFT JOIN users u ON f.created_by::INTEGER = u.id
-      LEFT JOIN folders pf ON f.parent_id = pf.id
+      ${joinCreatedBy}
+      ${joinParentFolder}
       WHERE 1=1
     `;
     const params = [];
